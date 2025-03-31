@@ -12,12 +12,12 @@ from langchain.agents import OpenAIFunctionsAgent
 from agent.executor import CustomAgentExecutor
 # Import functions from tools.py
 from tools import (
-    list_files, aggregate_data, filter_data,
+    list_files,
     visualize_data, data_quality_report, time_series_analysis,
     correlation_analysis
 )
-
-
+from tools.data_analysis import get_columns, transform_data, show_data_sample, check_missing_values, detect_outliers, aggregate_data, summary_statistics, filter_data
+from tools.visualization import visualize_data, aggregate_and_visualize
 def log(message):
     """Force debug messages to console."""
     print(f"DEBUG: {message}", flush=True)
@@ -52,16 +52,75 @@ def initialize_custom_agent():
             description="List all available data files in the data directory. No input required. Returns a list of filenames."
         ),
         StructuredTool.from_function(
+            func=check_missing_values,
+            name="CheckMissingValues",
+            description=(
+                "Analyze missing values in a data file. "
+                "Input should be a JSON object with: "
+                "'file_name' (string, required)"
+            ),
+            return_direct=True
+        ),
+        
+        StructuredTool.from_function(
+            func=detect_outliers,
+            name="DetectOutliers",
+            description=(
+                "Identify outliers in data columns using statistical methods. "
+                "Input should be a JSON object with: "
+                "'file_name' (string, required), "
+                "'column' (string, required), "
+                "'method' (string, optional: 'iqr' or 'zscore', default='iqr'), "
+                "'threshold' (number, optional: default 1.5 for IQR, 3 for Z-score)"
+            ),
+            return_direct=True
+        ),
+
+        StructuredTool.from_function(
             func=filter_data,
             name="FilterData",
-            description="Filter data based on conditions. Input should be a dictionary with 'file_name' (str) and 'conditions' (list of lists, each containing [column, operator, value])."
+            description=(
+                "Filter data based on conditions. "
+                "Input should be a JSON object with: "
+                "'file_name' (string, required), "
+                "'conditions' (array of arrays, required: each containing "
+                "[column (string), operator (string: '==', '!=', '>', '<', '>=', '<='), value]"
+            ),
+            return_direct=True
         ),
+
         StructuredTool.from_function(
             func=aggregate_data,
             name="AggregateData",
-            description="Calculate statistics on a column. Input should be a dictionary with 'file_name' (str), 'column' (str), and 'agg_funcs' (list of str)."
+            description=(
+                "Calculate statistics on data columns using aggregation methods. "
+                "Input should be a JSON object with: "
+                "'file_name' (string, required), "
+                "'column' (string, required), "
+                "'agg_funcs' (array of strings, required: supported functions are "
+                "'mean', 'max', 'min', 'sum', 'count')"
+            ),
+            return_direct=True
         ),
         StructuredTool.from_function(
+            func=summary_statistics,
+            name="SummaryStatistics",
+            description=(
+                "Calculate summary statistics for all numeric columns in a file. "
+                "Input should be a JSON object with: "
+                "'file_name' (string, required)"
+            ),
+            return_direct=True
+        ),
+        StructuredTool.from_function(
+            func=aggregate_and_visualize,
+            name="AggregateAndVisualize",
+            description="Aggregates data by specified column and creates visualization. "
+                    "Required parameters: file_name, value_col (column to average), "
+                    "group_by (column to group by). Optional: plot_type (default: 'bar').",
+            return_direct=True
+        ),
+            StructuredTool.from_function(
             func=visualize_data,
             name="VisualizeData",
             description="Create visualizations. Input should be a dictionary with 'file_name' (str), 'plot_type' (str), 'y_col' (str), and optionally 'x_col' (str)."
@@ -88,6 +147,23 @@ def initialize_custom_agent():
             description="Useful for math calculations. Input should be a math expression as a string."
         ),
         StructuredTool.from_function(
+            func=transform_data,
+            name="TransformData",
+            description="Create new columns or modify data. Input: dict with 'file_name', 'operations' (list of transforms like 'salary*0.1 as bonus')"
+        ),
+        StructuredTool.from_function(
+            func=show_data_sample,
+            name="ShowDataSample",
+            description="Show sample rows from a file. Input: dict with 'file_name' and optionally 'num_rows', 'columns'"
+        ),
+
+        StructuredTool.from_function(
+            func=get_columns,
+            name="GetColumns",
+            description="List columns and data types for a file. Input: dict with 'file_name'",
+            return_direct=True
+        ),
+        StructuredTool.from_function(
             func=final_answer,
             name="FinalAnswer",
             description="Stops execution and returns the final answer. Input should be the final answer string.",
@@ -101,17 +177,16 @@ def initialize_custom_agent():
         agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=5,
+        max_iterations=7,
         early_stopping_method="generate",
         return_intermediate_steps=True
     )
     
-    # Wrap the agent with our custom executor
     return CustomAgentExecutor.from_agent_and_tools(
         agent=agent.agent,
         tools=tools,
         verbose=True,
-        max_iterations=5,
-        handle_parsing_errors=True,
-        return_intermediate_steps=True
+        max_iterations=7,
+        handle_parsing_errors=True
     )
+    

@@ -68,7 +68,7 @@ class CustomAgentExecutor(AgentExecutor):
     
 def execute_agent_query(agent, query):
     try:
-        response = agent({"input": query})
+        response = agent.invoke({"input": query})
         
         # Check intermediate steps for should_stop
         if 'intermediate_steps' in response:
