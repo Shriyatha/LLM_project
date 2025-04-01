@@ -5,8 +5,11 @@ from typing import Dict, Any, List
 import logging
 from agent import initialize_custom_agent, execute_agent_query
 from pydantic import BaseModel
+import matplotlib.pyplot as plt
 import os
 from dotenv import load_dotenv
+import base64
+from io import BytesIO
 
 load_dotenv()
 
@@ -72,6 +75,13 @@ async def run_test_queries():
     for query in test_queries:
         try:
             result = execute_agent_query(app.state.agent, query)
+            if 'plot' in result:
+                # Convert plot to base64
+                buf = BytesIO()
+                result['plot'].savefig(buf, format='png', bbox_inches='tight')
+                plt.close(result['plot'])
+                plot_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+                result['plot'] = plot_base64
             results.append({
                 "query": query,
                 "output": result.get("output"),

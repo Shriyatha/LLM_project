@@ -67,6 +67,8 @@ def execute_agent_query(agent, query: str) -> Dict[str, Any]:
                     observation = step[1]
                     if isinstance(observation, dict) and observation.get("should_stop", False):
                         return {"output": observation.get("output", str(observation))}
+                    
+                
 
         return {"output": response.get("output", str(response))}
     except Exception as e:

@@ -307,7 +307,7 @@ def aggregate_and_visualize(
         return {
             "output": f"Successfully created {plot_type} plot: {plot_filename}",
             "plot_file": str(plot_filename),
-            "should_stop": False
+            "should_stop": True
         }
 
     except Exception as e:

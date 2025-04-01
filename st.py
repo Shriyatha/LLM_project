@@ -1,9 +1,12 @@
 import streamlit as st
 import requests
 import pandas as pd
-from io import StringIO
+from io import StringIO, BytesIO
 import time
 import os
+import base64
+from PIL import Image
+import matplotlib.pyplot as plt
 from typing import List, Dict
 
 # Configuration
@@ -16,8 +19,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "I can analyze your data files. Try:\n\n"
                                         "- 'Show data quality report'\n"
-                                        "- 'Check missing values'\n"
-                                        "- 'Find outliers in salary column'"}
+                                        "- 'Plot sales trends'\n"
+                                        "- 'Create histogram of ages'"}
     ]
 
 # Page setup
@@ -77,10 +80,57 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# --- Main Chat Interface ---
-for message in st.session_state.messages:
+# Custom message display function that handles plots
+def display_message(message):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+        
+        # Display plot if exists in message
+        if message.get("plot"):
+            try:
+                plot_bytes = base64.b64decode(message["plot"])
+                img = Image.open(BytesIO(plot_bytes))
+                st.image(img, use_column_width=True)
+                
+                # Add download button for plot
+                buf = BytesIO()
+                img.save(buf, format="PNG")
+                st.download_button(
+                    label="📥 Download Plot",
+                    data=buf,
+                    file_name="analysis_plot.png",
+                    mime="image/png"
+                )
+            except Exception as e:
+                st.warning(f"Couldn't display plot: {str(e)}")
+        
+        # Display dataframe if exists
+        if message.get("dataframe"):
+            try:
+                df = pd.read_json(StringIO(message["dataframe"]))
+                st.dataframe(df)
+                
+                # Add download button for data
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "💾 Download Data",
+                    data=csv,
+                    file_name="analysis_results.csv",
+                    mime="text/csv"
+                )
+            except Exception as e:
+                st.warning(f"Couldn't display data: {str(e)}")
+        
+        # Show analysis steps if available
+        if message.get("steps"):
+            with st.expander("🔍 Analysis Steps"):
+                for i, step in enumerate(message["steps"], 1):
+                    st.markdown(f"**Step {i}**")
+                    st.code(step if isinstance(step, str) else str(step))
+
+# --- Main Chat Interface ---
+for message in st.session_state.messages:
+    display_message(message)
 
 # Handle test queries
 if getattr(st.session_state, "run_tests", False):
@@ -99,11 +149,15 @@ if getattr(st.session_state, "run_tests", False):
                         st.markdown(result["query"])
                     
                     if result["success"]:
-                        st.session_state.messages.append(
-                            {"role": "assistant", "content": result["output"]}
-                        )
-                        with st.chat_message("assistant"):
-                            st.markdown(result["output"])
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": result["output"],
+                            "plot": result.get("plot"),
+                            "dataframe": result.get("dataframe"),
+                            "steps": result.get("steps", [])
+                        }
+                        st.session_state.messages.append(assistant_message)
+                        display_message(assistant_message)
                     else:
                         error_msg = f"Error: {result['error']}"
                         st.session_state.messages.append(
@@ -149,34 +203,20 @@ if prompt := st.chat_input("Ask about your data..."):
                     message_placeholder.markdown(full_response + "▌")
                 message_placeholder.markdown(full_response)
                 
-                # Show analysis steps if available
-                if steps := data.get("steps"):
-                    with st.expander("🔍 Analysis Steps"):
-                        for i, step in enumerate(steps, 1):
-                            st.markdown(f"**Step {i}**")
-                            st.code(step if isinstance(step, str) else str(step))
+                # Prepare assistant message with all data
+                assistant_message = {
+                    "role": "assistant",
+                    "content": full_response,
+                    "plot": data.get("plot"),
+                    "dataframe": data.get("dataframe"),
+                    "steps": data.get("steps", [])
+                }
                 
-                # Show data if returned
-                if "dataframe" in data:
-                    try:
-                        df = pd.read_json(StringIO(data["dataframe"]))
-                        st.subheader("📊 Results")
-                        st.dataframe(df)
-                        
-                        # Download button
-                        csv = df.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            "💾 Download Results",
-                            data=csv,
-                            file_name="analysis_results.csv",
-                            mime="text/csv"
-                        )
-                    except Exception as e:
-                        st.warning(f"Couldn't display data: {str(e)}")
+                # Display all components
+                display_message(assistant_message)
                 
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": full_response}
-                )
+                # Add to chat history
+                st.session_state.messages.append(assistant_message)
             else:
                 error_msg = f"API Error: {response.text[:200]}..."
                 st.error(error_msg)
@@ -199,5 +239,6 @@ st.markdown("""
         [data-testid="stExpander"] {margin-top: 20px;}
         .stButton button {border: 1px solid #ccc;}
         .st-emotion-cache-1qg05tj {padding: 0.5rem;}
+        .plot-container {margin-top: 1rem; margin-bottom: 1rem;}
     </style>
 """, unsafe_allow_html=True)
