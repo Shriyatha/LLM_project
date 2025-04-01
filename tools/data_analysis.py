@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional ,Union
 from config import validate_file_path
 from tools.data_loading import load_data
 from typing import List, Tuple, Any
@@ -58,110 +58,83 @@ def check_missing_values(file_name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"output": f"Error checking missing values: {str(e)}", "should_stop": True}
-    
-def check_missing_values(file_name: str) -> Dict[str, Any]:
-    """Analyze and report missing values in a data file"""
-    try:
-        df = load_data(file_name)
-        if isinstance(df, str):
-            return {"output": f"Data loading error: {df}", "should_stop": True}
 
-        # Calculate missing values
-        missing = df.isnull().sum()
-        missing_pct = (missing / len(df)) * 100
-        
-        # Format results
-        results = []
-        for col in df.columns:
-            results.append(
-                f"- {col}: {missing[col]} missing ({missing_pct[col]:.1f}%)"
-            )
-        
-        return {
-            "output": f"Missing values in {file_name}:\n" + "\n".join(results),
-            "missing_counts": missing.to_dict(),
-            "missing_percentages": missing_pct.to_dict(),
-            "should_stop": True
-        }
-    except Exception as e:
-        return {"output": f"Error checking missing values: {str(e)}", "should_stop": True}
+def detect_outliers(file_name: str, column: str, method: str = "iqr", threshold: float = 1.5) -> dict:
+    """Detect outliers in specified column of a data file.
     
-
-def sort_data(
-    file_name: str,
-    column: str,
-    ascending: bool = False
-) -> Dict[str, Any]:
-    """Sort CSV data by column with error handling."""
+    Returns:
+        Dictionary containing:
+            - output: str, result description
+            - should_stop: bool, always True for final answer
+    """
     try:
+        # Load data
         df = pd.read_csv(file_name)
         
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower()
+        column = column.strip().lower()
+        
+        # Validate column exists
         if column not in df.columns:
             return {
-                "output": f"Column '{column}' not found",
+                "output": f"Column '{column}' not found. Available columns: {list(df.columns)}",
                 "should_stop": True
             }
-            
-        sorted_df = df.sort_values(column, ascending=ascending)
-        return {
-            "output": f"Sorted by {column} ({'ascending' if ascending else 'descending'})",
-            "sorted_data": sorted_df.head(100).to_dict(orient="records"),
-            "should_stop": True
-        }
-    except Exception as e:
-        return {
-            "output": f"Sorting failed: {str(e)}",
-            "should_stop": True
-        }
-
-
-
-    
-def detect_outliers(file_name: str, column: str, method: str = "iqr", threshold: float = 1.5):
-    """Detect outliers in a given column using specified method."""
-    try:
-        df = load_data(file_name)
-        if isinstance(df, str):
-            return {"output": f"Data loading error: {df}", "should_stop": True}
-
-        if column not in df.columns:
-            return {"output": f"Error: Column '{column}' not found in {file_name}.", "should_stop": True}
-
-        # Convert column to numeric (handle potential dtype issues)
-        df[column] = pd.to_numeric(df[column], errors='coerce')
-
-        # Drop NaNs introduced by conversion
-        df = df.dropna(subset=[column])
-
-        if df[column].empty:
-            return {"output": f"Error: No valid numeric values in column '{column}'.", "should_stop": True}
-
-        # Detect outliers using IQR method
-        if method.lower() == "iqr":
-            Q1 = df[column].quantile(0.25)
-            Q3 = df[column].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - (threshold * IQR)
-            upper_bound = Q3 + (threshold * IQR)
-
-            outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
-
+        
+        # Convert to numeric
+        try:
+            data = pd.to_numeric(df[column], errors='raise')
+        except ValueError:
+            return {
+                "output": f"Column '{column}' contains non-numeric values",
+                "should_stop": True
+            }
+        
+        # Calculate outliers
+        if method == "iqr":
+            q1 = data.quantile(0.25)
+            q3 = data.quantile(0.75)
+            iqr = q3 - q1
+            lower_bound = q1 - threshold * iqr
+            upper_bound = q3 + threshold * iqr
+            outliers = df[(data < lower_bound) | (data > upper_bound)]
+            stats = f"IQR: {iqr:.2f}, Bounds: [{lower_bound:.2f}, {upper_bound:.2f}]"
+        elif method == "zscore":
+            z_scores = (data - data.mean()) / data.std()
+            outliers = df[abs(z_scores) > threshold]
+            stats = f"Mean: {data.mean():.2f}, Std: {data.std():.2f}"
         else:
-            return {"output": f"Error: Unsupported outlier detection method '{method}'.", "should_stop": True}
-
+            return {
+                "output": f"Invalid method '{method}'. Use 'iqr' or 'zscore'",
+                "should_stop": True
+            }
+        
         # Format results
-        outlier_count = len(outliers)
-        preview = outliers.head().to_dict(orient="records")
-
+        if outliers.empty:
+            return {
+                "output": f"No outliers found in '{column}' using {method} (threshold: {threshold})",
+                "should_stop": True
+            }
+        
+        output = (
+            f"Found {len(outliers)} outliers in '{column}':\n"
+            f"Method: {method} (threshold: {threshold})\n"
+            f"Statistics: {stats}\n"
+            f"Sample outliers:\n{outliers.head().to_string()}"
+        )
+        
         return {
-            "output": f"Identified {outlier_count} outliers in column '{column}' of {file_name}.",
-            "outlier_count": outlier_count,
-            "outlier_preview": preview,
+            "output": output,
+            "outliers": outliers.to_dict('records'),
             "should_stop": True
         }
-
+        
     except Exception as e:
-        return {"output": f"Error detecting outliers: {str(e)}", "should_stop": True}
+        return {
+            "output": f"Error detecting outliers: {str(e)}",
+            "should_stop": True
+        }
 
 
 def show_data_sample(
@@ -228,14 +201,17 @@ def transform_data(
     """
     try:
         df = load_data(file_name)
-        if df is None or not isinstance(df, pd.DataFrame):
-            return {"output": f"Data loading error: Invalid file {file_name}", "should_stop": True}
-
+        if isinstance(df, str):
+            return {"output": f"Data loading error: {df}", "should_stop": True}
+            
         for operation in operations:
             try:
+                # Simple implementation for operations like "salary*0.1 as bonus"
                 if " as " in operation:
                     expr, new_col = operation.split(" as ")
-                    df[new_col.strip()] = df.eval(expr.strip())
+                    expr = expr.strip()
+                    new_col = new_col.strip()
+                    df[new_col] = df.eval(expr)
                 else:
                     return {
                         "output": f"Invalid operation format: {operation}",
@@ -246,7 +222,7 @@ def transform_data(
                     "output": f"Error executing '{operation}': {str(e)}",
                     "should_stop": True
                 }
-        
+                
         if output_file:
             save_path = f"data/{output_file}"
             df.to_csv(save_path, index=False)
@@ -262,8 +238,12 @@ def transform_data(
                 "sample": sample,
                 "should_stop": True
             }
+            
     except Exception as e:
-        return {"output": f"Transformation error: {str(e)}", "should_stop": True}
+        return {
+            "output": f"Transformation error: {str(e)}",
+            "should_stop": True
+        }
     
 def filter_data(file_name: str, conditions: list) -> dict:
     """Filter data rows based on conditions.
@@ -328,7 +308,7 @@ def filter_data(file_name: str, conditions: list) -> dict:
         return {"output": f"Filter processing error: {str(e)}", "should_stop": True}
 
 def aggregate_data(file_name: str, column: str, agg_funcs: list) -> dict:
-    """Calculate statistics on a data column.
+    """Perform aggregation operations on a specified column, with automatic numeric conversion.
     
     Args:
         file_name: Name of the file to analyze
@@ -344,38 +324,60 @@ def aggregate_data(file_name: str, column: str, agg_funcs: list) -> dict:
         if isinstance(df, str):
             return {"output": f"Data loading error: {df}", "should_stop": True}
 
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower()
+        column = column.strip().lower()
+
         # Validate column exists
         if column not in df.columns:
-            return {"output": f"Column '{column}' not found", "should_stop": True}
+            available_cols = list(df.columns)
+            return {"output": f"Column '{column}' not found. Available columns: {available_cols}", 
+                    "should_stop": True}
 
-        # Convert to numeric
-        try:
-            data = pd.to_numeric(df[column], errors='raise')
-        except ValueError:
-            return {"output": f"Column '{column}' must be numeric", "should_stop": True}
+        # Convert to numeric if needed (for all numeric columns)
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        for col in df.columns:
+            if col not in numeric_cols:
+                df[col] = pd.to_numeric(df[col], errors='ignore')
 
-        # Calculate aggregations
+        # Check if we have numeric data for aggregation
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            return {"output": f"Cannot aggregate non-numeric column '{column}'",
+                    "should_stop": True}
+
+        # Supported aggregation functions
+        valid_funcs = {
+            'count': 'count',
+            'mean': 'mean',
+            'max': 'max',
+            'min': 'min',
+            'sum': 'sum',
+            'std': 'std',
+            'median': 'median',
+            'nunique': 'nunique'
+        }
+
+        # Calculate requested aggregations
         results = {}
         for func in agg_funcs:
-            func = func.lower()
-            if func == 'mean':
-                results['mean'] = data.mean()
-            elif func == 'max':
-                results['max'] = data.max()
-            elif func == 'min':
-                results['min'] = data.min()
-            elif func == 'sum':
-                results['sum'] = data.sum()
-            elif func == 'count':
-                results['count'] = data.count()
-            else:
-                return {"output": f"Unsupported function: {func}", "should_stop": True}
+            func_lower = func.lower()
+            if func_lower not in valid_funcs:
+                return {"output": f"Unsupported aggregation function: {func}",
+                        "should_stop": True}
+            
+            try:
+                if func_lower == 'count':
+                    results[func_lower] = df[column].count()
+                else:
+                    results[func_lower] = getattr(df[column], valid_funcs[func_lower])()
+            except Exception as e:
+                results[func_lower] = f"Error calculating {func}: {str(e)}"
 
         # Format results
-        output = f"Aggregation results for '{column}':\n"
-        output += "\n".join([f"{k}: {v:.2f}" if isinstance(v, float) else f"{k}: {v}" 
-                           for k, v in results.items()])
-        
+        output = f"Aggregation results for column '{column}':\n"
+        for func, value in results.items():
+            output += f"- {func}: {value}\n"
+
         return {
             "output": output,
             "results": results,
@@ -384,6 +386,71 @@ def aggregate_data(file_name: str, column: str, agg_funcs: list) -> dict:
 
     except Exception as e:
         return {"output": f"Aggregation error: {str(e)}", "should_stop": True}
+
+
+def Sort_data(
+    file_name: str,
+    column: str,
+    order: str,
+    filter_column: Optional[str] = None,
+    filter_operator: Optional[str] = None,  # NEW: Operator for filtering
+    filter_value: Optional[Union[str, int, float]] = None
+) -> Dict:
+    """Sorts data by a specified column in ascending or descending order with optional filtering using operators."""
+    try:
+        df = load_data(file_name.strip())
+        if isinstance(df, str):
+            return {"error": df}
+
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower()
+        column = column.strip().lower()
+
+        if column not in df.columns:
+            return {"error": f"Column '{column}' not found in {file_name}. Available: {list(df.columns)}"}
+
+        # Apply optional filtering with operators
+        if filter_column and filter_operator and filter_value is not None:
+            filter_column = filter_column.strip().lower()
+            if filter_column not in df.columns:
+                return {"error": f"Column '{filter_column}' not found in {file_name}."}
+
+            try:
+                filter_value = float(filter_value) if df[filter_column].dtype in ['int64', 'float64'] else filter_value
+
+                if filter_operator == '>':
+                    df = df[df[filter_column] > filter_value]
+                elif filter_operator == '>=':
+                    df = df[df[filter_column] >= filter_value]
+                elif filter_operator == '<':
+                    df = df[df[filter_column] < filter_value]
+                elif filter_operator == '<=':
+                    df = df[df[filter_column] <= filter_value]
+                elif filter_operator == '==':
+                    df = df[df[filter_column] == filter_value]
+                elif filter_operator == '!=':
+                    df = df[df[filter_column] != filter_value]
+                else:
+                    return {"error": f"Invalid filter operator '{filter_operator}'"}
+            except Exception as e:
+                return {"error": f"Error filtering column '{filter_column}': {str(e)}"}
+
+        # Perform sorting
+        ascending = order.lower() == 'asc'
+        df = df.sort_values(by=column, ascending=ascending)
+        output = f"Sorting done with column '{column}'"
+
+        if not df.empty:
+            output += ":\n" + df.head().to_string()
+
+        return {
+            "output": output,
+            "filtered_data": df.to_dict('records'),
+            "should_stop": True
+        }
+    except Exception as e:
+        return {"error": f"Sorting error: {str(e)}"}
+
 
 def summary_statistics(file_name: str) -> dict:
     """Calculate summary statistics for all numeric columns in a file.
@@ -433,7 +500,7 @@ def summary_statistics(file_name: str) -> dict:
         return {"output": f"Summary statistics error: {str(e)}", "should_stop": True} 
 
 def correlation_analysis(file_name: str, cols: List[str]) -> Dict:
-    """Calculates correlation between specified columns."""
+    """Calculates correlation between specified columns (numerical only)."""
     try:
         df = load_data(file_name)
         if isinstance(df, str):
@@ -448,17 +515,26 @@ def correlation_analysis(file_name: str, cols: List[str]) -> Dict:
         if missing_cols:
             return {"error": f"Columns not found: {missing_cols}. Available: {list(df.columns)}"}
 
-        # Convert to numeric
-        for col in cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        df = df.dropna(subset=cols)
+        # Select only numeric columns
+        numeric_cols = [col for col in cols if pd.api.types.is_numeric_dtype(df[col])]
+        if not numeric_cols:
+            return {"error": "No numeric columns found for correlation analysis"}
+            
+        # Convert remaining columns to numeric (in case they're stored as strings)
+        for col in numeric_cols:
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Drop rows with NA values in our numeric columns
+        df = df.dropna(subset=numeric_cols)
 
         # Calculate correlation
-        corr_matrix = df[cols].corr()
+        corr_matrix = df[numeric_cols].corr()
 
         return {
             "status": "success",
             "correlation_matrix": corr_matrix.to_dict(),
+            "columns_used": numeric_cols,  # Show which columns were actually used
             "should_stop": True
         }
     except Exception as e:
