@@ -58,73 +58,111 @@ def check_missing_values(file_name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"output": f"Error checking missing values: {str(e)}", "should_stop": True}
-
-def detect_outliers(params: dict) -> dict:
-    """Detect outliers in specified column of a data file.
     
-    Args:
-        params: Dictionary containing:
-            - file_name: str, name of the file to analyze
-            - column: str, column name to check for outliers
-            - method: str (optional), detection method ('iqr' or 'zscore'), defaults to 'iqr'
-            - threshold: float (optional), cutoff threshold, defaults to 1.5 for IQR or 3 for Z-score
-    
-    Returns:
-        Dictionary with:
-            - output: str, result description
-            - outliers: list (optional), outlier records
-            - should_stop: bool, always True for final answer
-    """
-    # Set defaults
-    method = params.get('method', 'iqr').lower()
-    threshold = params.get('threshold', 1.5 if method == 'iqr' else 3.0)
-    
+def check_missing_values(file_name: str) -> Dict[str, Any]:
+    """Analyze and report missing values in a data file"""
     try:
-        # Load and validate data
-        df = load_data(params['file_name'])
+        df = load_data(file_name)
         if isinstance(df, str):
             return {"output": f"Data loading error: {df}", "should_stop": True}
 
-        if params['column'] not in df.columns:
-            return {"output": f"Column '{params['column']}' not found", "should_stop": True}
-
-        try:
-            data = pd.to_numeric(df[params['column']], errors='raise')
-        except ValueError:
-            return {"output": f"Column '{params['column']}' must be numeric", "should_stop": True}
-
-        # Calculate outliers
-        if method == "iqr":
-            q1 = data.quantile(0.25)
-            q3 = data.quantile(0.75)
-            iqr = q3 - q1
-            lower_bound = q1 - threshold * iqr
-            upper_bound = q3 + threshold * iqr
-            outliers = df[(data < lower_bound) | (data > upper_bound)]
-        else:  # zscore
-            z_scores = (data - data.mean()) / data.std()
-            outliers = df[abs(z_scores) > threshold]
-
+        # Calculate missing values
+        missing = df.isnull().sum()
+        missing_pct = (missing / len(df)) * 100
+        
         # Format results
-        if outliers.empty:
+        results = []
+        for col in df.columns:
+            results.append(
+                f"- {col}: {missing[col]} missing ({missing_pct[col]:.1f}%)"
+            )
+        
+        return {
+            "output": f"Missing values in {file_name}:\n" + "\n".join(results),
+            "missing_counts": missing.to_dict(),
+            "missing_percentages": missing_pct.to_dict(),
+            "should_stop": True
+        }
+    except Exception as e:
+        return {"output": f"Error checking missing values: {str(e)}", "should_stop": True}
+    
+
+def sort_data(
+    file_name: str,
+    column: str,
+    ascending: bool = False
+) -> Dict[str, Any]:
+    """Sort CSV data by column with error handling."""
+    try:
+        df = pd.read_csv(file_name)
+        
+        if column not in df.columns:
             return {
-                "output": f"No outliers detected in '{params['column']}' using {method} method (threshold: {threshold})",
+                "output": f"Column '{column}' not found",
                 "should_stop": True
             }
+            
+        sorted_df = df.sort_values(column, ascending=ascending)
+        return {
+            "output": f"Sorted by {column} ({'ascending' if ascending else 'descending'})",
+            "sorted_data": sorted_df.head(100).to_dict(orient="records"),
+            "should_stop": True
+        }
+    except Exception as e:
+        return {
+            "output": f"Sorting failed: {str(e)}",
+            "should_stop": True
+        }
+
+
+
+    
+def detect_outliers(file_name: str, column: str, method: str = "iqr", threshold: float = 1.5):
+    """Detect outliers in a given column using specified method."""
+    try:
+        df = load_data(file_name)
+        if isinstance(df, str):
+            return {"output": f"Data loading error: {df}", "should_stop": True}
+
+        if column not in df.columns:
+            return {"output": f"Error: Column '{column}' not found in {file_name}.", "should_stop": True}
+
+        # Convert column to numeric (handle potential dtype issues)
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+
+        # Drop NaNs introduced by conversion
+        df = df.dropna(subset=[column])
+
+        if df[column].empty:
+            return {"output": f"Error: No valid numeric values in column '{column}'.", "should_stop": True}
+
+        # Detect outliers using IQR method
+        if method.lower() == "iqr":
+            Q1 = df[column].quantile(0.25)
+            Q3 = df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - (threshold * IQR)
+            upper_bound = Q3 + (threshold * IQR)
+
+            outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+
+        else:
+            return {"output": f"Error: Unsupported outlier detection method '{method}'.", "should_stop": True}
+
+        # Format results
+        outlier_count = len(outliers)
+        preview = outliers.head().to_dict(orient="records")
 
         return {
-            "output": (
-                f"Found {len(outliers)} outliers in '{params['column']}':\n"
-                f"Method: {method}\n"
-                f"Threshold: {threshold}\n"
-                f"Sample outliers:\n{outliers.head().to_string()}"
-            ),
-            "outliers": outliers.to_dict('records'),
+            "output": f"Identified {outlier_count} outliers in column '{column}' of {file_name}.",
+            "outlier_count": outlier_count,
+            "outlier_preview": preview,
             "should_stop": True
         }
 
     except Exception as e:
-        return {"output": f"Outlier detection error: {str(e)}", "should_stop": True}
+        return {"output": f"Error detecting outliers: {str(e)}", "should_stop": True}
+
 
 def show_data_sample(
     file_name: str, 
@@ -190,17 +228,14 @@ def transform_data(
     """
     try:
         df = load_data(file_name)
-        if isinstance(df, str):
-            return {"output": f"Data loading error: {df}", "should_stop": True}
-            
+        if df is None or not isinstance(df, pd.DataFrame):
+            return {"output": f"Data loading error: Invalid file {file_name}", "should_stop": True}
+
         for operation in operations:
             try:
-                # Simple implementation for operations like "salary*0.1 as bonus"
                 if " as " in operation:
                     expr, new_col = operation.split(" as ")
-                    expr = expr.strip()
-                    new_col = new_col.strip()
-                    df[new_col] = df.eval(expr)
+                    df[new_col.strip()] = df.eval(expr.strip())
                 else:
                     return {
                         "output": f"Invalid operation format: {operation}",
@@ -211,7 +246,7 @@ def transform_data(
                     "output": f"Error executing '{operation}': {str(e)}",
                     "should_stop": True
                 }
-                
+        
         if output_file:
             save_path = f"data/{output_file}"
             df.to_csv(save_path, index=False)
@@ -227,12 +262,8 @@ def transform_data(
                 "sample": sample,
                 "should_stop": True
             }
-            
     except Exception as e:
-        return {
-            "output": f"Transformation error: {str(e)}",
-            "should_stop": True
-        }
+        return {"output": f"Transformation error: {str(e)}", "should_stop": True}
     
 def filter_data(file_name: str, conditions: list) -> dict:
     """Filter data rows based on conditions.
