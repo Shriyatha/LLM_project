@@ -6,31 +6,31 @@ def run_test_queries():
     
     test_queries = [
         # Basic file operations
-        # "What files are available for analysis?",
-        # "Show me the first 5 rows of 'test.csv'",
-        # "List all columns in 'test.csv' with their data types",
+        "What files are available for analysis?",
+        "Show me the first 5 rows of 'test.csv'",
+        "List all columns in 'test.csv' with their data types",
         
         # # # Data quality checks
-        # "Show me a data quality report for 'test.csv'",
-        # "Check for missing values in 'test.csv'",
+        "Show me a data quality report for 'test.csv'",
+        "Check for missing values in 'test.csv'",
         "Identify outliers in the salary column of 'test.csv'",
         
         # # Descriptive statistics
-        #"What is the average and maximum salary in 'test.csv'?",
-        #"Show summary statistics for numeric columns in 'test.csv'",
-        #"Calculate the correlation matrix for 'test.csv'",
+        "What is the average and maximum salary in 'test.csv'?",
+        "Show summary statistics for numeric columns in 'test.csv'",
+        "Calculate the correlation matrix for 'test.csv'",
         
         # Data filtering and manipulation
-        # "Filter 'test.csv' where age > 30",
-        # "Sort 'test.csv' by salary in descending order",
-        # "Create a new column 'bonus' as 10% of salary in 'test.csv'",
+        "Filter 'test.csv' where age > 30",
+        "Sort 'test.csv' by salary in descending order",
+        "Create a new column 'bonus' as 10% of salary in 'test.csv'",
         
         # Aggregation operations
-        # "Count employees by department in 'employees.csv'",
+        "Count employees by department in 'employees.csv'",
         
         # Sorting query
-        # "sort the users by age in test.csv?"
-        # "sort the users by date in stock_data.csv with price more than 153?",
+        "sort the users by age in test.csv?"
+        "sort the users by date in stock_data.csv with price more than 153?",
 
         # Visualization queries
         # "Create a histogram of salaries from 'test.csv'",

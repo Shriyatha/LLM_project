@@ -16,25 +16,21 @@ from tools import (
     visualize_data, data_quality_report, time_series_analysis,
     correlation_analysis
 )
-from tools.data_analysis import get_columns, transform_data, show_data_sample, check_missing_values, detect_outliers, aggregate_data,Sort_data, summary_statistics, filter_data
+from tools.data_analysis import get_columns, transform_data, show_data_sample, check_missing_values, detect_outliers, aggregate_data, summary_statistics, filter_data
 from tools.visualization import visualize_data, aggregate_and_visualize
-def log(message):
-    """Force debug messages to console."""
-    print(f"DEBUG: {message}", flush=True)
+from loguru import logger
+from logging_client import log_info, log_debug, log_warning, log_error
 
-# ✅ Wrap final_answer as a function
+
+
 def final_answer(output: str) -> str:
     """Stops execution and returns the final answer."""
-    log(f"FinalAnswer invoked with output: {output}")
+    log_debug(f"FinalAnswer invoked with output: {output}")
     return output
 
-final_answer_tool = StructuredTool.from_function(
-    func=final_answer,
-    name="FinalAnswer",
-    description="Stops execution and returns the final answer."
-)
-
 def initialize_custom_agent():
+    log_debug("Initializing callback manager and LLM...")
+
     callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
     llm = Ollama(
         model="llama3:8b",
@@ -42,9 +38,11 @@ def initialize_custom_agent():
         callback_manager=callback_manager
     )
 
-    # Math tool
+    log_debug("Initializing Math tool...")
+
     math_chain = LLMMathChain.from_llm(llm=llm, verbose=True)
 
+    log_info("Setting up tools...")
     tools = [
         StructuredTool.from_function(
             func=list_files,
@@ -70,8 +68,8 @@ def initialize_custom_agent():
                 "Input should be a JSON object with: "
                 "'file_name' (string, required), "
                 "'column' (string, required), "
-                "'method' (string, optional: 'iqr' or 'zscore'), "
-                "'threshold' (number, required)."
+                "'method' (string, optional: 'iqr' or 'zscore', default='iqr'), "
+                "'threshold' (number, optional: default 1.5 for IQR, 3 for Z-score)"
             ),
             return_direct=True
         ),
@@ -88,7 +86,6 @@ def initialize_custom_agent():
             ),
             return_direct=True
         ),
-
         StructuredTool.from_function(
             func=aggregate_data,
             name="AggregateData",
@@ -99,21 +96,6 @@ def initialize_custom_agent():
                 "'column' (string, required), "
                 "'agg_funcs' (array of strings, required: supported functions are "
                 "'mean', 'max', 'min', 'sum', 'count')"
-            ),
-            return_direct=True
-        ),
-        StructuredTool.from_function(
-            func=Sort_data,
-            name="SortData",
-            description=(
-            "Sort data by a specified column in ascending or descending order with optional filtering. "
-            "Input should be a JSON object with: "
-            "'file_name' (string, required), "
-            "'column' (string, required), "
-            "'order' (string, required: 'asc' for ascending, 'desc' for descending), "
-            "'filter_column' (string, optional), "
-            "'filter_operator' (str ,optional)"
-            "'filter_value' (string or integer, optional)"
             ),
             return_direct=True
         ),
@@ -135,7 +117,6 @@ def initialize_custom_agent():
                     "group_by (column to group by). Optional: plot_type (default: 'bar').",
             return_direct=True
         ),
-
             StructuredTool.from_function(
             func=visualize_data,
             name="VisualizeData",
@@ -186,7 +167,7 @@ def initialize_custom_agent():
             return_direct=True
         )
     ]
-
+    log_info("Initializing agent...")
     agent = initialize_agent(
         tools=tools,
         llm=llm,
@@ -198,11 +179,13 @@ def initialize_custom_agent():
         return_intermediate_steps=True
     )
     
-    return CustomAgentExecutor.from_agent_and_tools(
+    log_info("Creating custom agent executor...")
+    custom_agent_executor = CustomAgentExecutor.from_agent_and_tools(
         agent=agent.agent,
         tools=tools,
         verbose=True,
         max_iterations=7,
         handle_parsing_errors=True
     )
-    
+    log_info("Custom agent executor successfully initialized.")
+    return custom_agent_executor
