@@ -204,3 +204,19 @@ operations
   Field required [type=missing, input_value={'file_name': 'stock_data..., ['price', '>=', 153]]}, input_type=dict]
     For further information visit https://errors.pydantic.dev/2.10/v/missing
 2025-04-02 11:54:20.127 | INFO     | __main__:start_logging_server:46 - Agent response: {'input': 'sort the users by age in test.csv?sort the users by date in stock_data.csv with price more than 153?', 'output': "Error executing tool FilterData: 1 validation error for FilterData\noperations\n  Field required [type=missing, input_value={'file_name': 'stock_data..., ['price', '>=', 153]]}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.10/v/missing", 'intermediate_steps': [(AgentAction(tool='FilterData', tool_input={'file_name': 'stock_data.csv', 'conditions': [['date', '>=', '2022-01-01'], ['price', '>=', 153]]}, log='Thought:\nThe human wants to sort data based on different conditions.\n\nAction:\n```\n{\n  "action": "FilterData",\n  "action_input": {\n    "file_name": "stock_data.csv",\n    "conditions": [\n      ["date", ">=", "2022-01-01"],\n      ["price", ">=", 153]\n    ]\n  }\n}\n```\n\n'), None)]}
+2025-04-02 23:33:29.927 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
+2025-04-02 23:33:41.744 | INFO     | __main__:start_logging_server:46 - Starting API server
+2025-04-02 23:33:43.030 | INFO     | __main__:start_logging_server:46 - Starting API initialization
+2025-04-02 23:33:43.030 | INFO     | __main__:start_logging_server:46 - Starting API initialization
+2025-04-02 23:33:43.057 | INFO     | __main__:start_logging_server:46 - Setting up tools...
+2025-04-02 23:33:43.058 | INFO     | __main__:start_logging_server:46 - Setting up tools...
+2025-04-02 23:33:43.076 | INFO     | __main__:start_logging_server:46 - Initializing agent...
+2025-04-02 23:33:43.076 | INFO     | __main__:start_logging_server:46 - Initializing agent...
+2025-04-02 23:33:43.079 | INFO     | __main__:start_logging_server:46 - Creating custom agent executor...
+2025-04-02 23:33:43.079 | INFO     | __main__:start_logging_server:46 - Custom agent executor successfully initialized.
+2025-04-02 23:33:43.079 | INFO     | __main__:start_logging_server:46 - Creating custom agent executor...
+2025-04-02 23:33:43.079 | INFO     | __main__:start_logging_server:46 - Custom agent executor successfully initialized.
+2025-04-02 23:33:43.093 | INFO     | __main__:start_logging_server:46 - API initialized successfully
+2025-04-02 23:33:43.093 | INFO     | __main__:start_logging_server:46 - API initialized successfully
+2025-04-02 23:36:01.489 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
+2025-04-02 23:36:32.933 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555

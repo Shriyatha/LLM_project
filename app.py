@@ -1,169 +1,218 @@
-from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import Dict, Any, List, Optional
-from logging_client import log_info, log_debug, log_error, log_critical, setup_logging_client, log_trace
-from agent import initialize_custom_agent, execute_agent_query
-from pydantic import BaseModel
-import matplotlib.pyplot as plt
-import os
-from dotenv import load_dotenv
-import base64
-from io import BytesIO
+"""FastAPI application for data analysis with agent integration."""
+from __future__ import annotations
+
+import time
+from typing import Any
+
 import uvicorn
-from pathlib import Path
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-# Load environment variables
-load_dotenv()
+from agent import execute_agent_query, initialize_custom_agent
+from logging_client import log_debug, log_error, log_info, log_success, log_warning
 
-# Initialize logging client
-config_path = os.getenv('LOGGING_CONFIG', 'logging_config.yaml')
-setup_logging_client(config_path)
-
-app = FastAPI(
-    title="Data Analysis Agent API",
-    description="API for data analysis queries",
-    version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
-
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="Data Analysis API")
 
 class QueryRequest(BaseModel):
+    """Request model for query execution."""
+
     query: str
-    session_id: Optional[str] = None  # For session tracking
+    session_id: str | None = None
 
 class TestQueryResponse(BaseModel):
-    query: str
-    output: Optional[str]
-    plot: Optional[str]
-    success: bool
-    error: Optional[str]
+    """Response model for test queries."""
 
-# Initialize agent at startup with logging
+    query: str
+    output: str
+    steps: list[str]
+    success: bool
+    processing_time: float | None = None
+
+def _raise_initialization_error(msg: str) -> None:
+    """Raise initialization errors with logging.
+
+    Args:
+        msg: Error message to log and raise
+
+    """
+    log_error(msg)
+    raise RuntimeError(msg)
+
+def _create_test_query_response(
+    query: str,
+    result: dict[str, Any],
+    processing_time: float,
+) -> TestQueryResponse:
+    """Create a successful test query response.
+
+    Args:
+        query: The original query string
+        result: Dictionary containing query results
+        processing_time: Time taken to process the query
+
+    Returns:
+        TestQueryResponse: Formatted response object
+
+    """
+    return TestQueryResponse(
+        query=query,
+        output=result.get("output", "No results"),
+        steps=result.get("intermediate_steps", []),
+        success=True,
+        processing_time=processing_time,
+    )
+
 @app.on_event("startup")
-async def startup_event():
-    """Initialize the agent and setup logging context."""
+async def startup_event() -> None:
+    """Initialize the agent with detailed logging."""
     try:
         log_info("Starting API initialization")
-            
-        # Initialize agent
-        log_debug("Initializing custom agent")
+        start_time = time.time()
+
         app.state.agent = initialize_custom_agent()
-            
-        # Verify agent initialization
+
         if not app.state.agent:
-            raise RuntimeError("Agent initialization returned None")
-            
-        log_info("Agent initialized successfully")
-            
-    except Exception as e:
-        log_critical(f"API startup failed: {str(e)}")
-        raise RuntimeError(f"API startup failed: {str(e)}")
+            _raise_initialization_error("Agent initialization returned None")
 
-@app.post("/query", response_model=Dict[str, Any])
-async def process_query(request: QueryRequest):
-    """Process a data analysis query through the agent."""
+        init_time = time.time() - start_time
+        log_success(f"API initialized successfully in {init_time:.2f} seconds")
+        log_debug(f"Agent configuration: {str(app.state.agent)[:200]}...")
+
+    except Exception as e:
+        log_error(f"API startup failed: {e!s}", exc_info=True)
+        raise
+
+def _handle_test_query_failure(query: str, error: Exception) -> TestQueryResponse:
+    """Create a failed test query response with logging.
+
+    Args:
+        query: The original query string
+        error: Exception that occurred
+
+    Returns:
+        TestQueryResponse: Formatted error response
+
+    """
+    log_warning(f"Test query failed: {error!s}")
+    return TestQueryResponse(
+        query=query,
+        output=str(error),
+        steps=[],
+        success=False,
+    )
+
+def _process_single_query(query: str) -> TestQueryResponse:
+    """Process a single test query with error handling.
+
+    Args:
+        query: Query string to process
+
+    Returns:
+        TestQueryResponse: Result of the query processing
+
+    """
     try:
-        log_info(f"Processing new query: {request.query}, session_id: {request.session_id}")
-            
-        # Execute query
-        log_debug("Executing agent query")
-        result = execute_agent_query(app.state.agent, request.query)
-            
-        # Handle plot results
-        if 'plot' in result:
-            log_debug("Processing plot result")
-            buf = BytesIO()
-            result['plot'].savefig(buf, format='png', bbox_inches='tight')
-            plt.close(result['plot'])
-            plot_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-            result['plot'] = plot_base64
-            
-        log_info("Query processed successfully")
-        return {
-            "output": result.get("output", "No output returned"),
-            "steps": result.get("intermediate_steps", []),
-            "status": "success"
-        }
-            
-    except Exception as e:
-        log_error(f"Query processing failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "Query processing failed",
-                "message": str(e)
-            }
-        )
+        log_debug(f"Processing test query: {query[:50]}...")
+        start_time = time.time()
+        result = execute_agent_query(app.state.agent, query)
+        processing_time = time.time() - start_time
+        log_info(f"Query completed in {processing_time:.2f}s")
+        return _create_test_query_response(query, result, processing_time)
+    except (ValueError, RuntimeError) as e:
+        return _handle_test_query_failure(query, e)
 
-@app.get("/test-queries", response_model=Dict[str, List[TestQueryResponse]])
-async def run_test_queries():
-    """Execute a suite of test queries for validation."""
-    test_queries = [
-        "Check for missing values in 'test.csv'",
-        "Identify outliers in the salary column of 'test.csv'",
-        "Show summary statistics for 'test.csv'"
-    ]
-    
-    results = []
-    for query in test_queries:
-        try:
-            log_debug(f"Executing test query: {query}")
-                
-            result = execute_agent_query(app.state.agent, query)
-                
-            response = {
-                "query": query,
-                "output": result.get("output"),
-                "success": True
-            }
-                
-            if 'plot' in result:
-                buf = BytesIO()
-                result['plot'].savefig(buf, format='png', bbox_inches='tight')
-                plt.close(result['plot'])
-                response['plot'] = base64.b64encode(buf.getvalue()).decode('utf-8')
-                
-            log_debug("Test query completed successfully")
-            results.append(response)
-                
-        except Exception as e:
-            log_error(f"Test query failed: {str(e)}")
-            results.append({
-                "query": query,
+@app.post("/execute-query", response_model=TestQueryResponse)
+async def execute_query(request: QueryRequest) -> TestQueryResponse:
+    """Execute a single query with full logging.
+
+    Args:
+        request: QueryRequest object containing the query
+
+    Returns:
+        TestQueryResponse: Result of the query execution
+
+    Raises:
+        HTTPException: If query execution fails
+
+    """
+    try:
+        log_info(f"New query received from session {request.session_id}")
+        log_debug(f"Query content: {request.query[:100]}...")
+        start_time = time.time()
+
+        result = execute_agent_query(app.state.agent, request.query)
+        processing_time = time.time() - start_time
+
+        log_info(f"Query processed in {processing_time:.2f} seconds")
+        log_debug(f"Query result sample: {str(result)[:200]}...")
+
+        if not result.get("output"):
+            log_warning("Query returned no output")
+
+        return _create_test_query_response(request.query, result, processing_time)
+
+    except Exception as e:
+        log_error(f"Query execution failed: {e!s}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "query": request.query,
                 "error": str(e),
-                "success": False
-            })
-    
-    log_info(f"Completed test queries with {len([r for r in results if r['success']])} successes")
-    return {"results": results}
+                "success": False,
+            },
+        ) from e
+
+@app.get("/run-test-suite", response_model=list[TestQueryResponse])
+async def run_test_suite() -> list[TestQueryResponse]:
+    """Execute test suite with detailed logging.
+
+    Returns:
+        list[TestQueryResponse]: List of test query results
+
+    """
+    test_queries = [
+        "What is the average and maximum salary in 'test.csv'?",
+        "Count employees by department in 'employees.csv'",
+    ]
+
+    log_info(f"Starting test suite with {len(test_queries)} queries")
+    results = [_process_single_query(query) for query in test_queries]
+
+    success_count = len([r for r in results if r.success])
+    log_info(f"Test suite completed: {success_count}/{len(results)} successful")
+    return results
 
 @app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    log_trace("Health check requested")
-    return {"status": "healthy", "version": app.version}
+async def health_check() -> dict[str, Any]:
+    """Health check endpoint with logging.
+
+    Returns:
+        dict: Health status information
+
+    """
+    try:
+        status = {
+            "status": "healthy" if app.state.agent else "unhealthy",
+            "agent_initialized": bool(app.state.agent),
+            "timestamp": time.time(),
+        }
+        log_debug(f"Health check: {status}")
+    except Exception as e:
+        log_error(f"Health check failed: {e!s}")
+        raise HTTPException(status_code=500, detail="Health check failed") from e
+    else:
+        return status
 
 if __name__ == "__main__":
-    # Configure logging for production
     log_info("Starting API server")
     try:
         uvicorn.run(
             app,
-            host=os.getenv("HOST", "0.0.0.0"),
-            port=int(os.getenv("PORT", 8000)),
-            log_config=None,  # Disable default uvicorn logging
-            access_log=False  # We handle logging ourselves
+            host="127.0.0.1",
+            port=8000,
+            log_level="info",
+            access_log=False,
         )
     except Exception as e:
-        log_critical(f"API server failed to start: {str(e)}")
+        log_error(f"Server failed to start: {e!s}")
         raise
