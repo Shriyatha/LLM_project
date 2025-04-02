@@ -1,302 +1,311 @@
-import streamlit as st
-import requests
-import pandas as pd
-from io import StringIO, BytesIO
+"""Streamlit application for data analysis with file management capabilities."""
 import time
-import os
-import base64
-from PIL import Image
-import matplotlib.pyplot as plt
-from typing import List, Dict, Optional
-from logging_client import log_info, log_error, log_debug, log_warning, log_trace, log_success
+from pathlib import Path
 
-# Configuration
-API_URL = os.getenv("API_URL", "http://localhost:8000")
-DATA_FOLDER = "data"
-os.makedirs(DATA_FOLDER, exist_ok=True)
+import requests
+import streamlit as st
 
-# Initialize session state with logging
+from logging_client import log_debug, log_error, log_info, log_success, log_warning
+
+# Constants
+API_URL = "http://localhost:8000"  # Update if your API is hosted elsewhere
+DATA_FOLDER = Path("./data")
+TIMEOUT = 30  # seconds
+HTTP_OK = 200
+
+# Initialize logging
+log_info("Initializing Streamlit application")
+
+# Create data directory if it doesn't exist
+DATA_FOLDER.mkdir(parents=True, exist_ok=True)
+
+# Page setup
+try:
+    st.set_page_config(page_title="Data Analysis Chat", layout="wide")
+    st.title("📊 Data Analysis Chat")
+    log_debug("Page configuration set")
+except Exception as e:
+    log_error(f"Page setup failed: {e!s}")
+    raise
+
+# Initialize chat history with logging
 if "messages" not in st.session_state:
     log_info("Initializing new chat session")
     st.session_state.messages = [
-        {"role": "assistant", "content": "I can analyze your data files. Try:\n\n"
-                                        "- 'Show data quality report'\n"
-                                        "- 'Plot sales trends'\n"
-                                        "- 'Create histogram of ages'"}
+        {"role": "assistant", "content": "Ask me anything about your data!"},
     ]
+    log_debug(f"Initial messages: {st.session_state.messages}")
 
-# Page setup
-st.set_page_config(page_title="📊 Data Analysis Chatbot", layout="wide")
-st.title("📊 Data Analysis Chatbot")
+def handle_file_upload(uploaded_files: list) -> None:
+    """Handle file uploads with proper error handling."""
+    for uploaded_file in uploaded_files:
 
-# --- File Management Sidebar ---
+        file_path = DATA_FOLDER / uploaded_file.name
+        with file_path.open("wb") as f:
+            f.write(uploaded_file.getbuffer())
+        log_success(f"File uploaded: {uploaded_file.name}")
+        st.success(f"Saved: {uploaded_file.name}")
+
+
+def handle_file_deletion(files_to_delete: list[str]) -> None:
+    """Handle file deletion with proper error handling."""
+    for file in files_to_delete:
+        file_path = DATA_FOLDER / file
+        file_path.unlink()
+        log_info(f"File deleted: {file}")
+        st.success(f"Deleted: {file}")
+
+# File Management Sidebar
 with st.sidebar:
     st.header("📂 File Management")
-    
+
     # File uploader with logging
     uploaded_files = st.file_uploader(
         "Upload CSV/Excel files",
         type=["csv", "xlsx"],
         accept_multiple_files=True,
-        key="file_uploader"
+        key="file_uploader",
     )
-    
+
     if uploaded_files:
-        for uploaded_file in uploaded_files:
-            try:
-                file_path = os.path.join(DATA_FOLDER, uploaded_file.name)
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                log_success(f"File uploaded: {uploaded_file.name}")
-                st.success(f"Saved: {uploaded_file.name}")
-            except Exception as e:
-                log_error(f"File upload failed: {str(e)}")
-                st.error(f"Error saving {uploaded_file.name}: {str(e)}")
-    
+        handle_file_upload(uploaded_files)
+
     # Display available files with delete option
-    available_files = [f for f in os.listdir(DATA_FOLDER) if f.endswith(('.csv', '.xlsx'))]
-    
+    available_files = [
+        f.name for f in DATA_FOLDER.iterdir()
+        if f.suffix in (".csv", ".xlsx")
+    ]
+
     if available_files:
         st.subheader("Your Files")
         cols = st.columns([3, 1])
         files_to_delete = []
-        
+
         for file in available_files:
             cols[0].markdown(f"📄 {file}")
             if cols[1].button("🗑️", key=f"del_{file}"):
                 files_to_delete.append(file)
-        
-        # Handle file deletion with logging
-        for file in files_to_delete:
-            try:
-                file_path = os.path.join(DATA_FOLDER, file)
-                os.remove(file_path)
-                log_info(f"File deleted: {file}")
-                st.success(f"Deleted: {file}")
-                st.rerun()
-            except Exception as e:
-                log_error(f"File deletion failed: {file} - {str(e)}")
-                st.error(f"Error deleting {file}: {str(e)}")
+
+        if files_to_delete:
+            handle_file_deletion(files_to_delete)
     else:
         log_debug("No data files found in directory")
         st.warning("No data files found")
-    
-    # Test queries button
-    if st.button("🧪 Run Test Queries", help="Execute predefined test queries"):
-        log_info("Test queries initiated")
-        st.session_state.run_tests = True
-    
-    # Clear chat button
-    if st.button("🗑️ Clear Chat History"):
-        log_info("Chat history cleared")
-        st.session_state.messages = []
-        st.rerun()
 
-# Custom message display function with logging
-def display_message(message: Dict):
-    """Display a chat message with support for plots and dataframes."""
-    with st.chat_message(message["role"]):
+    st.header("API Controls")
+
+    # Health check with logging
+    if st.button("🩺 Check API Health"):
+        log_info("Initiating API health check")
         try:
-            st.markdown(message["content"])
-            
-            # Display plot if exists
-            if message.get("plot"):
-                try:
-                    plot_bytes = base64.b64decode(message["plot"])
-                    img = Image.open(BytesIO(plot_bytes))
-                    st.image(img, use_column_width=True)
-                    
-                    # Download button for plot
-                    buf = BytesIO()
-                    img.save(buf, format="PNG")
-                    st.download_button(
-                        label="📥 Download Plot",
-                        data=buf,
-                        file_name="analysis_plot.png",
-                        mime="image/png"
-                    )
-                    log_debug("Plot displayed successfully")
-                except Exception as e:
-                    log_warning(f"Plot display failed: {str(e)}")
-                    st.warning(f"Couldn't display plot: {str(e)}")
-            
-            # Display dataframe if exists
-            if message.get("dataframe"):
-                try:
-                    df = pd.read_json(StringIO(message["dataframe"]))
-                    st.dataframe(df)
-                    
-                    # Download button for data
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        "💾 Download Data",
-                        data=csv,
-                        file_name="analysis_results.csv",
-                        mime="text/csv"
-                    )
-                    log_debug("Dataframe displayed successfully")
-                except Exception as e:
-                    log_warning(f"Dataframe display failed: {str(e)}")
-                    st.warning(f"Couldn't display data: {str(e)}")
-            
-            # Show analysis steps if available
-            if message.get("steps"):
-                with st.expander("🔍 Analysis Steps"):
-                    for i, step in enumerate(message["steps"], 1):
-                        st.markdown(f"**Step {i}**")
-                        st.code(step if isinstance(step, str) else str(step))
-                        log_trace(f"Analysis step {i}: {step}")
-        
-        except Exception as e:
-            log_error(f"Message display failed: {str(e)}")
-            st.error(f"Error displaying message: {str(e)}")
+            with st.spinner("Checking API health..."):
+                response = requests.get(
+                    f"{API_URL}/health",
+                    timeout=TIMEOUT,
+                )
 
-# --- Main Chat Interface ---
+            if response.status_code == HTTP_OK:
+                health = response.json()
+                status = ("🟢 Healthy" if health["status"] == "healthy"
+                          else "🔴 Unhealthy")
+                st.success(f"API Status: {status}")
+                st.json(health)
+                log_success(f"API health check: {status}")
+                log_debug(f"Health details: {health}")
+            else:
+                error_msg = f"API Error: {response.status_code}"
+                st.error(error_msg)
+                log_error(f"Health check failed: {error_msg}")
+        except requests.ConnectionError as e:
+            error_msg = "Could not connect to API"
+            st.error(error_msg)
+            log_error(f"API connection failed: {e!s}")
+        except requests.RequestException as e:
+            log_error(f"Health check error: {e!s}")
+            st.error(f"Unexpected error: {e!s}")
+
+    # Test suite with detailed logging
+    if st.button("🧪 Run Test Suite"):
+        log_info("Starting test suite execution")
+        try:
+            with st.spinner("Running test queries..."):
+                start_time = time.time()
+                response = requests.get(
+                    f"{API_URL}/run-test-suite",
+                    timeout=TIMEOUT,
+                )
+                processing_time = time.time() - start_time
+
+                if response.status_code == HTTP_OK:
+                    results = response.json()
+                    success_count = len([r for r in results if r["success"]])
+                    success_msg = (
+                        f"Completed {success_count}/{len(results)} tests "
+                        f"successfully in {processing_time:.2f}s"
+                    )
+                    st.success(success_msg)
+                    log_success(
+                        f"Test suite completed: {success_count}/{len(results)} "
+                        "successful",
+                    )
+
+                    for result in results:
+                        with st.expander(f"Test: {result['query'][:30]}..."):
+                            st.markdown(f"**Result:** {result['output'][:200]}...")
+                            st.code(f"Time: {result['processing_time']:.2f}s")
+                            log_debug(
+                                f"Test result - Query: {result['query'][:50]}..., "
+                                f"Success: {result['success']}",
+                            )
+                else:
+                    error_msg = f"API Error: {response.status_code}"
+                    st.error(error_msg)
+                    log_error(f"Test suite failed: {error_msg}")
+        except requests.ConnectionError as e:
+            error_msg = "Could not connect to API"
+            st.error(error_msg)
+            log_error(f"API connection failed during test suite: {e!s}")
+        except requests.RequestException as e:
+            log_error(f"Test suite execution error: {e!s}")
+            st.error(f"Unexpected error: {e!s}")
+
+def display_message(message: dict) -> None:
+    """Display a chat message with logging.
+
+    Args:
+        message: Dictionary containing message content and metadata.
+
+    """
+    try:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            log_debug(f"Displayed {message['role']} message")
+
+            # Show steps if available
+            if message.get("steps"):
+                with st.expander("🔍 See analysis steps"):
+                    for step in message["steps"]:
+                        st.code(step)
+                    log_info("Displayed analysis steps")
+    except (KeyError, TypeError) as e:
+        log_error(f"Failed to display message: {e!s}")
+        st.error(f"Error displaying message: {e!s}")
+
+# Display all messages
 for message in st.session_state.messages:
     display_message(message)
 
-# Handle test queries with logging
-if getattr(st.session_state, "run_tests", False):
-    st.session_state.run_tests = False
-    with st.spinner("Running test queries..."):
-        try:
-            log_debug("Executing test queries via API")
-            response = requests.get(f"{API_URL}/test-queries", timeout=30)
-            
-            if response.status_code == 200:
-                results = response.json().get("results", [])
-                log_info(f"Received {len(results)} test results")
-                
-                for result in results:
-                    # Add to chat history
-                    st.session_state.messages.append(
-                        {"role": "user", "content": result["query"]}
-                    )
-                    with st.chat_message("user"):
-                        st.markdown(result["query"])
-                    
-                    if result["success"]:
-                        assistant_message = {
-                            "role": "assistant",
-                            "content": result["output"],
-                            "plot": result.get("plot"),
-                            "dataframe": result.get("dataframe"),
-                            "steps": result.get("steps", [])
-                        }
-                        st.session_state.messages.append(assistant_message)
-                        display_message(assistant_message)
-                        log_debug(f"Test query succeeded: {result['query']}")
-                    else:
-                        error_msg = f"Error: {result['error']}"
-                        st.session_state.messages.append(
-                            {"role": "assistant", "content": error_msg}
-                        )
-                        with st.chat_message("assistant"):
-                            st.error(error_msg)
-                        log_warning(f"Test query failed: {result['query']} - {result['error']}")
-            else:
-                error_msg = f"API returned status {response.status_code}"
-                log_error(error_msg)
-                st.error(error_msg)
-        
-        except Exception as e:
-            log_error("Test queries execution failed", exc_info=True)
-            st.error(f"Failed to run tests: {str(e)}")
-
-# Handle user input with comprehensive logging
+# Chat input with comprehensive logging
 if prompt := st.chat_input("Ask about your data..."):
     try:
-        log_info(f"New user query: {prompt}")
+        log_info(f"New user input received: {prompt[:50]}...")
+
+        # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
-        
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        
+        display_message({"role": "user", "content": prompt})
+
+        # Prepare API request with file context
+        available_files = [
+            f.name for f in DATA_FOLDER.iterdir()
+            if f.suffix in (".csv", ".xlsx")
+        ]
+        file_context = (
+            f"Available files: {', '.join(available_files)}"
+            if available_files
+            else "No files available"
+        )
+        full_prompt = f"{file_context}\n\nQuestion: {prompt}"
+
+        request_data = {
+            "query": full_prompt,
+            "session_id": f"streamlit_session_{time.time()}",
+        }
+        log_debug(f"Prepared API request with files: {available_files}")
+
+        # Display assistant response
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             full_response = ""
-            
+
             try:
-                # Include available files in the query context
-                context_files = available_files if available_files else ["No files available"]
-                prompt_with_context = f"Files: {', '.join(context_files)}\n\nQuery: {prompt}"
-                log_debug(f"Query with context: {prompt_with_context}")
-                
-                # API call with timeout
-                log_debug("Making API request")
+                # Call API with timing
+                log_info("Making API request to /execute-query")
+                start_time = time.time()
+
                 response = requests.post(
-                    f"{API_URL}/query",
-                    json={"query": prompt_with_context},
-                    timeout=30
+                    f"{API_URL}/execute-query",
+                    json=request_data,
+                    timeout=TIMEOUT,
                 )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    output = data.get("output", "")
-                    
-                    # Typewriter effect
+
+                processing_time = time.time() - start_time
+                log_info(f"API response received in {processing_time:.2f} seconds")
+
+                if response.status_code == HTTP_OK:
+                    result = response.json()
+                    full_response = result.get("output", "No response")
+                    steps = result.get("steps", [])
+
+                    # Typewriter effect with logging
                     log_debug("Displaying response with typewriter effect")
-                    for chunk in output.split():
+                    for chunk in full_response.split():
                         full_response += chunk + " "
                         time.sleep(0.05)
                         message_placeholder.markdown(full_response + "▌")
                     message_placeholder.markdown(full_response)
-                    
-                    # Prepare assistant message
-                    assistant_message = {
-                        "role": "assistant",
-                        "content": full_response,
-                        "plot": data.get("plot"),
-                        "dataframe": data.get("dataframe"),
-                        "steps": data.get("steps", [])
-                    }
-                    
-                    # Display all components
-                    display_message(assistant_message)
-                    
-                    # Add to chat history
-                    st.session_state.messages.append(assistant_message)
-                    log_info("Query processed successfully")
-                else:
-                    error_msg = f"API Error: {response.text[:200]}..."
-                    log_error(f"API response error: {response.status_code} - {error_msg}")
-                    st.error(error_msg)
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": error_msg}
+
+                    # Show steps if available
+                    if steps:
+                        with st.expander("🔍 See analysis steps"):
+                            for i, step in enumerate(steps, 1):
+                                st.code(f"Step {i}: {step}")
+                                log_info(f"Analysis step {i}: {step[:50]}...")
+
+                    success_msg = (
+                        f"Query processed successfully in {processing_time:.2f}s"
                     )
-            
+                    log_success(success_msg)
+                else:
+                    error_msg = (
+                        f"API Error {response.status_code}: "
+                        f"{response.text[:200]}..."
+                    )
+                    st.error(error_msg)
+                    full_response = error_msg
+                    log_error(f"API request failed: {error_msg}")
+
             except requests.Timeout:
                 error_msg = "Request timed out. Please try again."
+                st.error(error_msg)
+                full_response = error_msg
                 log_warning("API request timeout")
-                st.error(error_msg)
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": error_msg}
-                )
-            
-            except Exception as e:
-                error_msg = f"Error: {str(e)}"
-                log_error("Query processing failed", exc_info=True)
-                st.error(error_msg)
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": error_msg}
-                )
-    
-    except Exception as e:
-        log_error("Chat input handling failed", exc_info=True)
-        st.error(f"System error: {str(e)}")
 
-# Enhanced CSS with logging
-try:
-    st.markdown("""
-        <style>
-            .stChatInput {position: fixed; bottom: 20px;}
-            .stChatMessage {padding: 12px; border-radius: 8px;}
-            [data-testid="stExpander"] {margin-top: 20px;}
-            .stButton button {border: 1px solid #ccc;}
-            .st-emotion-cache-1qg05tj {padding: 0.5rem;}
-            .plot-container {margin-top: 1rem; margin-bottom: 1rem;}
-        </style>
-    """, unsafe_allow_html=True)
-    log_debug("CSS styles applied successfully")
-except Exception as e:
-    log_warning(f"CSS application failed: {str(e)}")
+            except requests.ConnectionError:
+                error_msg = "Could not connect to API"
+                st.error(error_msg)
+                full_response = error_msg
+                log_error("API connection failed")
+
+            except requests.RequestException as e:
+                error_msg = f"Unexpected error: {e!s}"
+                st.error(error_msg)
+                full_response = error_msg
+                log_error(f"Query processing failed: {e!s}")
+
+        # Add assistant response to chat history
+        assistant_message = {
+            "role": "assistant",
+            "content": full_response,
+            "steps": steps if "steps" in locals() else [],
+        }
+        st.session_state.messages.append(assistant_message)
+        log_debug("Added assistant response to chat history")
+
+    except (requests.RequestException, KeyError, TypeError) as e:
+        log_error(f"Chat input processing failed: {e!s}")
+        st.error(f"System error: {e!s}")
+    except (ValueError, RuntimeError, ConnectionAbortedError) as e:
+        log_error(f"Unexpected error in chat processing: {e!s}")
+        st.error("An unexpected error occurred. Please try again.")
+
+log_debug("Streamlit application running")

@@ -1,0 +1,76 @@
+[project]
+name = "data-analysis-agent"
+version = "0.1.0"
+description = "Data Analysis Agent with FastAPI backend and Streamlit frontend"
+requires-python = ">=3.9"
+
+
+dependencies = [
+    # Core dependencies
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0",
+    "pyyaml",
+    "toml",
+    "jsonschema",
+    
+    # Data processing
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "openpyxl>=3.1.0",
+    "pyarrow>=12.0.0",
+    "scipy>=1.0.0",
+    
+    # Visualization
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "plotly>=5.15.0",
+    "pillow>=10.0.1",
+    
+    # LangChain ecosystem
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.1",
+    "ollama>=0.1.0",
+    
+    # Backend
+    "fastapi==0.95.2",
+    "uvicorn==0.22.0",
+    "httpx==0.24.1",
+    "python-multipart==0.0.6",
+    "pyzmq",
+    
+    # Frontend
+    "streamlit==1.28.0",
+    "requests==2.31.0",
+    
+    # Logging
+    "loguru>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.0",
+    "mypy>=1.0",
+    "ruff>=0.0.280",
+    "jupyter>=1.0",
+    "ipython>=8.0",
+]
+
+
+docs = [
+    "mkdocs>=1.0",
+    "mkdocstrings[python]>=0.20",
+    "mkdocs-material>=9.6.4",
+    "pymdown-extensions",
+    "pygments",
+]
+
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 88
+select = ["ALL"]
