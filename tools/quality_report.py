@@ -4,22 +4,36 @@ import pandas as pd
 from typing import Dict
 from config import validate_file_path
 from tools.data_loading import load_data
+from logging_client import log_info, log_debug, log_critical, log_error, log_warning
 
 def data_quality_report(file_name: str) -> Dict:
-    """Generates a comprehensive data quality report."""
+    """Generates a comprehensive data quality report with centralized logging."""
+    log_info(f"Starting data quality assessment for: {file_name}")
+    
     try:
+        # Data loading phase
+        log_debug(f"Loading dataset: {file_name}")
         df = load_data(file_name)
         if isinstance(df, str):
+            log_error(f"Data loading failed: {df}")
             return {"output": df, "should_stop": True}
+        
+        log_info(f"Data loaded successfully. Dimensions: {df.shape}")
+        log_debug(f"Columns detected: {list(df.columns)}")
+        log_debug(f"Data sample:\n{df.head(2).to_string()}")  # Detailed debug
 
-        # Convert numpy types to native Python for JSON serialization
+        # Data conversion helper
         def convert_to_serializable(obj):
             if isinstance(obj, (np.integer, np.floating)):
                 return int(obj) if isinstance(obj, np.integer) else float(obj)
             return obj
 
-        # Basic statistics
+        # Report generation
+        log_debug("Calculating quality metrics")
         numeric_cols = df.select_dtypes(include=[np.number]).columns
+        log_debug(f"Numeric columns identified: {list(numeric_cols)}")
+
+        # Core metrics calculation
         report = {
             'file_name': file_name,
             'total_rows': len(df),
@@ -42,7 +56,7 @@ def data_quality_report(file_name: str) -> Dict:
             'sample_data': {col: convert_to_serializable(df[col].head().tolist()) for col in df.columns}
         }
 
-        # Generate a summary of data quality issues
+        # Quality issues detection
         quality_issues = []
         for col in df.columns:
             issues = []
@@ -66,10 +80,15 @@ def data_quality_report(file_name: str) -> Dict:
         report['quality_issues'] = quality_issues
         report['quality_score'] = 100 - (len(quality_issues) / len(df.columns)) * 50
 
+        log_info(f"Quality report generated. Score: {report['quality_score']:.1f}")
+        log_debug(f"Quality issues found: {len(quality_issues)}")
+
         return {
             "output": f"Data Quality Report for {file_name}:\n{json.dumps(report, indent=2)}",
             "report": report,
             "should_stop": True
         }
+
     except Exception as e:
+        log_critical(f"Critical error during quality assessment: {str(e)}")
         return {"output": f"Quality report error: {str(e)}", "should_stop": True}

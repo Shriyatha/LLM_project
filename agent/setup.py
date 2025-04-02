@@ -18,23 +18,19 @@ from tools import (
 )
 from tools.data_analysis import get_columns, transform_data, show_data_sample, check_missing_values, detect_outliers, aggregate_data, summary_statistics, filter_data
 from tools.visualization import visualize_data, aggregate_and_visualize
-def log(message):
-    """Force debug messages to console."""
-    print(f"DEBUG: {message}", flush=True)
+from loguru import logger
+from logging_client import log_info, log_debug, log_warning, log_error
 
-# ✅ Wrap final_answer as a function
+
+
 def final_answer(output: str) -> str:
     """Stops execution and returns the final answer."""
-    log(f"FinalAnswer invoked with output: {output}")
+    log_debug(f"FinalAnswer invoked with output: {output}")
     return output
 
-final_answer_tool = StructuredTool.from_function(
-    func=final_answer,
-    name="FinalAnswer",
-    description="Stops execution and returns the final answer."
-)
-
 def initialize_custom_agent():
+    log_debug("Initializing callback manager and LLM...")
+
     callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
     llm = Ollama(
         model="llama3:8b",
@@ -42,9 +38,11 @@ def initialize_custom_agent():
         callback_manager=callback_manager
     )
 
-    # Math tool
+    log_debug("Initializing Math tool...")
+
     math_chain = LLMMathChain.from_llm(llm=llm, verbose=True)
 
+    log_info("Setting up tools...")
     tools = [
         StructuredTool.from_function(
             func=list_files,
@@ -88,7 +86,6 @@ def initialize_custom_agent():
             ),
             return_direct=True
         ),
-
         StructuredTool.from_function(
             func=aggregate_data,
             name="AggregateData",
@@ -129,7 +126,7 @@ def initialize_custom_agent():
             func=data_quality_report,
             name="DataQualityReport",
             description="Generate a data quality report. Input should be a dictionary with 'file_name' (str).",
-            return_direct=True  # This will make it return directly
+            return_direct=True  
         ),
         StructuredTool.from_function(
             func=time_series_analysis,
@@ -170,7 +167,7 @@ def initialize_custom_agent():
             return_direct=True
         )
     ]
-
+    log_info("Initializing agent...")
     agent = initialize_agent(
         tools=tools,
         llm=llm,
@@ -182,11 +179,13 @@ def initialize_custom_agent():
         return_intermediate_steps=True
     )
     
-    return CustomAgentExecutor.from_agent_and_tools(
+    log_info("Creating custom agent executor...")
+    custom_agent_executor = CustomAgentExecutor.from_agent_and_tools(
         agent=agent.agent,
         tools=tools,
         verbose=True,
         max_iterations=7,
         handle_parsing_errors=True
     )
-    
+    log_info("Custom agent executor successfully initialized.")
+    return custom_agent_executor
