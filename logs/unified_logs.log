@@ -220,3 +220,39 @@ operations
 2025-04-02 23:33:43.093 | INFO     | __main__:start_logging_server:46 - API initialized successfully
 2025-04-02 23:36:01.489 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
 2025-04-02 23:36:32.933 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
+2025-04-03 00:57:05.842 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
+2025-04-03 00:57:29.371 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 00:57:29.422 | INFO     | __main__:start_logging_server:46 - Initializing new chat session
+2025-04-03 00:57:34.117 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 00:57:34.131 | INFO     | __main__:start_logging_server:46 - New user input received: List all the files...
+2025-04-03 00:57:34.133 | INFO     | __main__:start_logging_server:46 - Making API request to /execute-query
+2025-04-03 00:57:34.143 | ERROR    | __main__:start_logging_server:42 - API connection failed
+2025-04-03 00:57:44.238 | ERROR    | __main__:start_logging_server:50 - Logging server error: Address already in use (addr='tcp://0.0.0.0:5555')
+2025-04-03 00:57:49.295 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 00:57:49.356 | INFO     | __main__:start_logging_server:46 - Initializing new chat session
+2025-04-03 00:57:54.403 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 00:57:54.409 | INFO     | __main__:start_logging_server:46 - New user input received: List all the files...
+2025-04-03 00:57:54.411 | INFO     | __main__:start_logging_server:46 - Making API request to /execute-query
+2025-04-03 00:57:54.423 | ERROR    | __main__:start_logging_server:42 - API connection failed
+2025-04-03 00:58:04.659 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 00:58:04.672 | INFO     | __main__:start_logging_server:46 - Initiating API health check
+2025-04-03 00:58:04.679 | ERROR    | __main__:start_logging_server:42 - API connection failed: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x12706a2c0>: Failed to establish a new connection: [Errno 61] Connection refused'))
+2025-04-03 01:01:52.759 | ERROR    | __main__:start_logging_server:50 - Logging server error: Address already in use (addr='tcp://0.0.0.0:5555')
+2025-04-03 01:01:58.261 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 01:01:58.332 | INFO     | __main__:start_logging_server:46 - Initializing new chat session
+2025-04-03 01:02:03.350 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 01:02:03.354 | INFO     | __main__:start_logging_server:46 - New user input received: List all the files...
+2025-04-03 01:02:03.356 | INFO     | __main__:start_logging_server:46 - Making API request to /execute-query
+2025-04-03 01:02:03.359 | ERROR    | __main__:start_logging_server:42 - API connection failed
+2025-04-03 01:02:13.433 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 01:02:13.444 | INFO     | __main__:start_logging_server:46 - Initiating API health check
+2025-04-03 01:02:13.458 | ERROR    | __main__:start_logging_server:42 - API connection failed: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x11fcb96c0>: Failed to establish a new connection: [Errno 61] Connection refused'))
+2025-04-03 01:02:14.709 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 01:02:14.715 | INFO     | __main__:start_logging_server:46 - Initiating API health check
+2025-04-03 01:02:14.720 | ERROR    | __main__:start_logging_server:42 - API connection failed: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x11fcba740>: Failed to establish a new connection: [Errno 61] Connection refused'))
+2025-04-03 01:02:15.176 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 01:02:15.182 | INFO     | __main__:start_logging_server:46 - Initiating API health check
+2025-04-03 01:02:15.187 | ERROR    | __main__:start_logging_server:42 - API connection failed: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x11fcbb610>: Failed to establish a new connection: [Errno 61] Connection refused'))
+2025-04-03 01:02:15.373 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-03 01:02:15.378 | INFO     | __main__:start_logging_server:46 - Initiating API health check
+2025-04-03 01:02:15.382 | ERROR    | __main__:start_logging_server:42 - API connection failed: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x11fcbbdf0>: Failed to establish a new connection: [Errno 61] Connection refused'))

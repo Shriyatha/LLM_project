@@ -1,41 +1,49 @@
-langchain
-loguru
-langchain>=0.1.0
-langchain-community>=0.0.1
-ollama>=0.1.0
-loguru>=0.7.0
-pandas>=1.0.0
-numpy>=1.0.0
-matplotlib>=3.0.0
-seaborn>=0.11.0
-scipy>=1.0.0
-python-dotenv>=1.0.0
-pydantic>=2.0  
-pyyaml
-toml
-jsonschema
-pandas>=2.0.0
-numpy>=1.24.0
-openpyxl>=3.1.0  # For Excel file support
-pyarrow>=12.0.0 
-matplotlib>=3.7.0
-seaborn>=0.12.0
-plotly>=5.15.0
-loguru
-pyzmq
-
-fastapi==0.95.2
-uvicorn==0.22.0
-python-dotenv==1.0.0
-matplotlib==3.7.1
-httpx==0.24.1
-toml==0.10.2
-pydantic==1.10.7
+# Core Application Dependencies
+fastapi==0.109.1
+uvicorn==0.27.0
 python-multipart==0.0.6
-
-streamlit==1.28.0
-requests==2.31.0
-pandas==2.1.1
-matplotlib==3.7.1
-pillow==10.0.1
+pydantic==2.6.1
 python-dotenv==1.0.0
+
+# AI/ML Components
+langchain==0.1.5
+langchain-community==0.0.19
+ollama==0.1.2
+
+# Data Processing
+pandas==2.1.3
+numpy==1.26.3
+openpyxl==3.1.2
+pyarrow==14.0.2
+scipy==1.11.4
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.1
+plotly==5.18.0
+pillow==10.1.0
+
+# Utilities & Logging
+loguru==0.7.2
+pyzmq==25.1.1
+python-dateutil==2.8.2
+tqdm==4.66.1
+pyyaml==6.0.1
+toml==0.10.2
+jsonschema==4.20.0
+requests==2.31.0
+
+# Web Interface
+streamlit==1.28.2
+
+# Development & Testing
+pytest==7.4.4
+httpx
+pytest-asyncio==0.23.5
+
+# Documentation
+mkdocs-material
+mkdocs-mermaid2-plugin
+pymdown-extensions
+pygments 
+python-dotenv
