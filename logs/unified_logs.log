@@ -256,3 +256,66 @@ operations
 2025-04-03 01:02:15.373 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
 2025-04-03 01:02:15.378 | INFO     | __main__:start_logging_server:46 - Initiating API health check
 2025-04-03 01:02:15.382 | ERROR    | __main__:start_logging_server:42 - API connection failed: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x11fcbbdf0>: Failed to establish a new connection: [Errno 61] Connection refused'))
+2025-04-04 23:08:45.926 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - Initializing new chat session
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - New user input received: Create a histogram of salaries from 'test.csv'...
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - Making API request to /execute-query
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - API response received in 28.54 seconds
+2025-04-04 23:08:45.930 | INFO     | __main__:start_logging_server:46 - Query processed successfully in 28.54s
+2025-04-04 23:09:38.092 | INFO     | __main__:start_logging_server:46 - Starting API initialization
+2025-04-04 23:09:38.119 | INFO     | __main__:start_logging_server:46 - Setting up tools...
+2025-04-04 23:09:38.135 | INFO     | __main__:start_logging_server:46 - Initializing agent...
+2025-04-04 23:09:38.139 | INFO     | __main__:start_logging_server:46 - Creating custom agent executor...
+2025-04-04 23:09:38.139 | INFO     | __main__:start_logging_server:46 - Custom agent executor successfully initialized.
+2025-04-04 23:09:38.139 | INFO     | __main__:start_logging_server:46 - API initialized successfully in 0.05 seconds
+2025-04-04 23:09:59.639 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-04 23:09:59.674 | INFO     | __main__:start_logging_server:46 - Initializing new chat session
+2025-04-04 23:10:10.495 | INFO     | __main__:start_logging_server:46 - Initializing Streamlit application
+2025-04-04 23:10:10.500 | INFO     | __main__:start_logging_server:46 - New user input received: Create a histogram of salaries from 'test.csv'...
+2025-04-04 23:10:10.501 | INFO     | __main__:start_logging_server:46 - Making API request to /execute-query
+2025-04-04 23:10:10.518 | INFO     | __main__:start_logging_server:46 - New query received from session streamlit_session_1743788410.501239
+2025-04-04 23:10:10.518 | INFO     | __main__:start_logging_server:46 - Executing agent query: Available files: sales_data.csv, test.csv, employees.csv
+
+Question: Create a histogram of salaries from 'test.csv'
+2025-04-04 23:10:10.519 | INFO     | __main__:start_logging_server:46 - Agent execution started with inputs: {'input': "Available files: sales_data.csv, test.csv, employees.csv\n\nQuestion: Create a histogram of salaries from 'test.csv'"}
+2025-04-04 23:10:24.305 | INFO     | __main__:start_logging_server:46 - Executing tool: VisualizeData with input: {'file_name': 'test.csv', 'plot_type': 'histogram', 'y_col': 'salary'}
+2025-04-04 23:10:24.343 | INFO     | __main__:start_logging_server:46 - Starting visualization: histogram plot for test.csv
+2025-04-04 23:10:24.344 | INFO     | __main__:start_logging_server:46 - Loading data file: test.csv
+2025-04-04 23:10:24.561 | INFO     | __main__:start_logging_server:46 - Successfully loaded test.csv with shape (3, 3)
+2025-04-04 23:10:24.616 | INFO     | __main__:start_logging_server:46 - Data loaded successfully. Shape: (3, 3)
+2025-04-04 23:10:26.230 | INFO     | __main__:start_logging_server:46 - Successfully created hist plot: plots/hist_plot_20250404_174024.png
+2025-04-04 23:10:26.231 | INFO     | __main__:start_logging_server:46 - Tool VisualizeData execution successful. Result: {'output': 'Successfully created hist plot: plots/hist_plot_20250404_174024.png', 'plot_file': 'plots/hist_plot_20250404_174024.png', 'should_stop': True}
+2025-04-04 23:10:26.232 | INFO     | __main__:start_logging_server:46 - Stopping execution based on observation.
+2025-04-04 23:10:26.232 | INFO     | __main__:start_logging_server:46 - Agent response: {'input': "Available files: sales_data.csv, test.csv, employees.csv\n\nQuestion: Create a histogram of salaries from 'test.csv'", 'output': 'Successfully created hist plot: plots/hist_plot_20250404_174024.png', 'intermediate_steps': [(AgentAction(tool='VisualizeData', tool_input={'file_name': 'test.csv', 'plot_type': 'histogram', 'y_col': 'salary'}, log='Action:\n```\n{\n  "action": "VisualizeData",\n  "action_input": {\n    "file_name": "test.csv",\n    "plot_type": "histogram",\n    "y_col": "salary"\n  }\n}\n```\n\n'), {'output': 'Successfully created hist plot: plots/hist_plot_20250404_174024.png', 'plot_file': 'plots/hist_plot_20250404_174024.png', 'should_stop': True})], 'should_stop': True}
+2025-04-04 23:10:26.232 | INFO     | __main__:start_logging_server:46 - Agent stopping due to should_stop in steps.
+2025-04-04 23:10:26.232 | INFO     | __main__:start_logging_server:46 - Query processed in 15.71 seconds
+2025-04-04 23:10:26.267 | INFO     | __main__:start_logging_server:46 - API response received in 15.76 seconds
+2025-04-04 23:10:26.277 | INFO     | __main__:start_logging_server:46 - Query processed successfully in 15.76s
+2025-04-05 15:56:21.255 | INFO     | __main__:start_logging_server:30 - Logging server started on port 5555
+2025-04-05 15:56:24.868 | INFO     | __main__:start_logging_server:46 - Starting API initialization
+2025-04-05 15:56:24.903 | INFO     | __main__:start_logging_server:46 - Setting up tools...
+2025-04-05 15:56:24.921 | INFO     | __main__:start_logging_server:46 - Initializing agent...
+2025-04-05 15:56:24.925 | INFO     | __main__:start_logging_server:46 - Creating custom agent executor...
+2025-04-05 15:56:24.925 | INFO     | __main__:start_logging_server:46 - Custom agent executor successfully initialized.
+2025-04-05 15:56:24.925 | INFO     | __main__:start_logging_server:46 - API initialized successfully in 0.06 seconds
+2025-04-05 15:56:26.078 | INFO     | __main__:start_logging_server:46 - Initializing Enhanced Streamlit application
+2025-04-05 15:56:26.132 | INFO     | __main__:start_logging_server:46 - Initializing new chat session
+2025-04-05 15:56:40.077 | INFO     | __main__:start_logging_server:46 - Initializing Enhanced Streamlit application
+2025-04-05 15:56:40.089 | INFO     | __main__:start_logging_server:46 - New user input received: List all the files...
+2025-04-05 15:56:40.652 | INFO     | __main__:start_logging_server:46 - Making API request to /execute-query
+2025-04-05 15:56:40.676 | INFO     | __main__:start_logging_server:46 - New query received from session streamlit_session_1743848800.089613
+2025-04-05 15:56:40.677 | INFO     | __main__:start_logging_server:46 - Executing agent query: Available files: sales_data.csv, test.csv, employees.csv
+
+Question: List all the files
+2025-04-05 15:56:40.678 | INFO     | __main__:start_logging_server:46 - Agent execution started with inputs: {'input': 'Available files: sales_data.csv, test.csv, employees.csv\n\nQuestion: List all the files'}
+2025-04-05 15:56:53.217 | INFO     | __main__:start_logging_server:46 - Executing tool: ListFiles with input: {}
+2025-04-05 15:56:53.998 | INFO     | __main__:start_logging_server:46 - Listing available data files
+2025-04-05 15:56:53.998 | INFO     | __main__:start_logging_server:46 - Tool ListFiles execution successful. Result: {'output': 'Available data files: sales_data.csv, test.csv, employees.csv', 'files': ['sales_data.csv', 'test.csv', 'employees.csv'], 'should_stop': True}
+2025-04-05 15:56:54.000 | INFO     | __main__:start_logging_server:46 - Stopping execution based on observation.
+2025-04-05 15:56:54.000 | INFO     | __main__:start_logging_server:46 - Agent response: {'input': 'Available files: sales_data.csv, test.csv, employees.csv\n\nQuestion: List all the files', 'output': 'Available data files: sales_data.csv, test.csv, employees.csv', 'intermediate_steps': [(AgentAction(tool='ListFiles', tool_input={}, log='Action:\n```\n{\n  "action": "ListFiles",\n  "args": {}\n}\n```\n\n'), {'output': 'Available data files: sales_data.csv, test.csv, employees.csv', 'files': ['sales_data.csv', 'test.csv', 'employees.csv'], 'should_stop': True})], 'should_stop': True}
+2025-04-05 15:56:54.000 | INFO     | __main__:start_logging_server:46 - Agent stopping due to should_stop in steps.
+2025-04-05 15:56:54.000 | INFO     | __main__:start_logging_server:46 - Query processed in 12.56 seconds
+2025-04-05 15:56:54.001 | INFO     | __main__:start_logging_server:46 - API response received in 12.61 seconds
+2025-04-05 15:56:54.002 | INFO     | __main__:start_logging_server:46 - Query processed successfully in 12.61s
