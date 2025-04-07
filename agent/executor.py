@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain.agents import AgentExecutor
 
 from logging_client import log_debug, log_error, log_info, log_warning
+
+if TYPE_CHECKING:
+    from langchain.callbacks.base import BaseCallbackManager
 
 
 class ToolExecutionError(Exception):
@@ -46,7 +49,7 @@ class CustomAgentExecutor(AgentExecutor):
         self,
         tool_name: str,
         tool_input: str | dict[str, str],
-        run_manager: Any | None,  # Manager for handling the execution run
+        run_manager: BaseCallbackManager | None = None,  # type: ignore[name-defined]
     ) -> str | dict[str, Any]:
         """Execute the specified tool with the given input.
 
@@ -59,8 +62,7 @@ class CustomAgentExecutor(AgentExecutor):
             The result from tool execution as either a string or dictionary
 
         Raises:
-            ValueError: If the specified tool is not found
-            Exception: For any errors during tool execution
+            ToolExecutionError: If the specified tool is not found or execution fails
 
         """
         log_info(f"Executing tool: {tool_name} with input: {tool_input}")
@@ -72,7 +74,11 @@ class CustomAgentExecutor(AgentExecutor):
             raise ToolExecutionError(error_msg)
 
         try:
-            result = tool_map[tool_name].run(tool_input, verbose=self.verbose)
+            result = tool_map[tool_name].run(
+                tool_input,
+                verbose=self.verbose,
+                callbacks=run_manager.get_child() if run_manager else None,
+            )
             log_info(f"Tool {tool_name} execution successful. Result: {result}")
         except Exception as exc:
             error_msg = f"Error executing tool {tool_name}: {exc!s}"
@@ -82,7 +88,9 @@ class CustomAgentExecutor(AgentExecutor):
             return result
 
     def _call(
-        self, inputs: dict[str, str], run_manager: object | None = None,
+        self,
+        inputs: dict[str, str],
+        run_manager: BaseCallbackManager | None = None,  # type: ignore[name-defined]
     ) -> dict[str, Any]:
         """Run the agent loop until final answer or max iterations.
 
@@ -113,7 +121,6 @@ class CustomAgentExecutor(AgentExecutor):
                     intermediate_steps=intermediate_steps,
                 ).__dict__
 
-            # Handle stopping conditions
             if getattr(output, "should_stop", False):
                 log_info("Agent stopping due to should_stop flag.")
                 return ExecutionResult(
@@ -129,7 +136,6 @@ class CustomAgentExecutor(AgentExecutor):
                     intermediate_steps=intermediate_steps,
                 ).__dict__
 
-            # Execute tool if specified
             if hasattr(output, "tool"):
                 try:
                     observation = self._execute_tool(
