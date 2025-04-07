@@ -1,29 +1,31 @@
 # Core Application Dependencies
-fastapi==0.109.1
-uvicorn==0.27.0
+fastapi==0.115.12
+uvicorn==0.34.0
 python-multipart==0.0.6
-pydantic==2.6.1
-python-dotenv==1.0.0
+pydantic==2.10.6
+python-dotenv==1.0.1
 
 # AI/ML Components
-langchain==0.1.5
-langchain-community==0.0.19
-ollama==0.1.2
-
-# Data Processing
+langchain==0.3.21
+langchain-community==0.3.20
+langchain-core==0.3.49
+ollama==0.4.7
+langchain-ollama==0.3.0
+# Data Processing (unchanged)
 pandas==2.1.3
 numpy==1.26.3
 openpyxl==3.1.2
-pyarrow==14.0.2
-scipy==1.11.4
+pyarrow==18.0.0
+scipy==1.13.1
+numexpr==2.10.2
 
-# Visualization
-matplotlib==3.8.2
-seaborn==0.13.1
-plotly==5.18.0
-pillow==10.1.0
+# Visualization (unchanged)
+matplotlib==3.10.1
+seaborn==0.13.2
+plotly==5.24.1
+pillow==10.0.0
 
-# Utilities & Logging
+# Utilities & Logging (unchanged)
 loguru==0.7.2
 pyzmq==25.1.1
 python-dateutil==2.8.2
@@ -33,12 +35,10 @@ toml==0.10.2
 jsonschema==4.20.0
 requests==2.31.0
 
-# Web Interface
-streamlit==1.28.2
+streamlit==1.39.0
 
-# Development & Testing
-pytest==7.4.4
-httpx
+pytest==8.3.3
+httpx==0.28.1
 pytest-asyncio==0.23.5
 
 # Documentation

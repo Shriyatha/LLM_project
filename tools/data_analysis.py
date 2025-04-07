@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -409,168 +408,71 @@ def _format_aggregation_results(column: str, results: dict) -> str:
         else:
             output.append(f"- {func}: {value}")
     return "\n".join(output)
-@dataclass
-class ValidationContext:
-    """Container for validation parameters to reduce function arguments."""
 
-    dataframe: pd.DataFrame
-    column: str | None
-    agg_funcs: list[str] | None
-    group_by: str | None
-    cols_available: list[str]
-    valid_funcs: dict[str, str]
-
-
-def aggregate_data(
-    file_name: str,
-    column: str | None = None,
-    agg_funcs: list[str] | None = None,
-    group_by: str | None = None,
-) -> dict[str, Any]:
+def aggregate_data(file_name: str, column: str = None,
+                   agg_funcs: list = None, group_by: str = None) -> dict:
     """Perform aggregation operations on a specified column."""
     log_info(f"Aggregating data from {file_name}")
 
     valid_funcs = {
-        "count": "count",
-        "mean": "mean",
-        "max": "max",
-        "min": "min",
-        "sum": "sum",
-        "std": "std",
-        "median": "median",
-        "nunique": "nunique",
+        "count": "count", "mean": "mean", "max": "max",
+        "min": "min", "sum": "sum", "std": "std",
+        "median": "median", "nunique": "nunique",
     }
 
     try:
         dataframe = load_data(file_name)
         if isinstance(dataframe, str):
-            return _error_response(f"Data loading error: {dataframe}")
+            log_error(f"Data loading error: {dataframe}")
+            return {"output": f"Data loading error: {dataframe}", "should_stop": True}
 
-        cols_available = list(dataframe.columns)
-        log_debug(f"Columns available: {cols_available}")
+        log_debug(f"Columns available in {file_name}: {list(dataframe.columns)}")
         dataframe.columns = dataframe.columns.str.strip().str.lower()
 
-        context = ValidationContext(
-            dataframe=dataframe,
-            column=column,
-            agg_funcs=agg_funcs,
-            group_by=group_by,
-            cols_available=cols_available,
-            valid_funcs=valid_funcs,
-        )
+        # If column is None or empty, perform row count
+        if not column:
+            if "count" in agg_funcs:
+                count_result = len(dataframe)
+                return {"output": f"Total row count: {count_result}",
+                        "results": {"count": count_result}, "should_stop": True}
+            error_msg = "Column is required unless performing a row count with 'count'."
+            log_error(error_msg)
+            return {"output": error_msg, "should_stop": True}
 
-        if error_response := _validate_inputs(context):
-            return error_response
+        column = column.strip().lower()
+        if group_by:
+            group_by = group_by.strip().lower()
 
-        results = _perform_aggregation(context)
-        output = _format_aggregation_results(context.column, results)
-    except Exception as e:  # noqa: BLE001
-        return _error_response(f"Aggregation error: {e!s}")
+        if column not in dataframe.columns:
+            error_msg = f"Column '{column}' not found. Available: {list(dataframe.columns)}"
+            log_error(error_msg)
+            return {"output": error_msg, "should_stop": True}
+
+        if group_by and group_by not in dataframe.columns:
+            error_msg = f"Group-by column '{group_by}' not found."
+            log_error(error_msg)
+            return {"output": error_msg, "should_stop": True}
+
+        invalid_funcs = [f for f in agg_funcs if f.lower() not in valid_funcs]
+        if invalid_funcs:
+            error_msg = f"Unsupported aggregation functions: {invalid_funcs}"
+            log_error(error_msg)
+            return {"output": error_msg, "should_stop": True}
+
+        if group_by:
+            results = dataframe.groupby(group_by)[column].agg(
+                [valid_funcs[f.lower()] for f in agg_funcs])
+            results = results.to_dict(orient="index")
+        else:
+            results = {func: getattr(dataframe[column],
+                                     valid_funcs[func.lower()])() for func in agg_funcs}
+
+        output = _format_aggregation_results(column, results)
+    except (OSError) as e:
+        log_error(f"Error aggregating data: {e!s}")
+        return {"output": f"Aggregation error: {e!s}", "should_stop": True}
     else:
-        return {
-            "output": output,
-            "results": results,
-            "should_stop": True,
-        }
-
-
-def _validate_inputs(
-    context: ValidationContext,
-) -> dict[str, Any] | None:
-    """Validate all inputs using the validation context."""
-    validators = [
-        _validate_column_requirement,
-        _validate_column_exists,
-        _validate_group_by_column,
-        _validate_agg_funcs,
-    ]
-
-    for validator in validators:
-        if result := validator(context):
-            return result
-    return None
-
-
-def _validate_column_requirement(
-    context: ValidationContext,
-) -> dict[str, Any] | None:
-    """Validate column requirement."""
-    if not context.column:
-        if context.agg_funcs and "count" in context.agg_funcs:
-            return {
-                "output": f"Total row count: {len(context.dataframe)}",
-                "results": {"count": len(context.dataframe)},
-                "should_stop": True,
-            }
-        return _error_response(
-            "Column required unless performing row count with 'count'",
-        )
-    return None
-
-
-def _validate_column_exists(
-    context: ValidationContext,
-) -> dict[str, Any] | None:
-    """Validate column exists in dataframe."""
-    if (context.column and
-        context.column.strip().lower() not in context.cols_available):
-        msg = f"Column '{context.column}' not found."
-        return _error_response(msg)
-    return None
-
-
-def _validate_group_by_column(
-    context: ValidationContext,
-) -> dict[str, Any] | None:
-    """Validate group_by column exists."""
-    if (context.group_by and
-        context.group_by.strip().lower() not in context.cols_available):
-        msg = f"Group-by column '{context.group_by}' not found"
-        return _error_response(msg)
-    return None
-
-
-def _validate_agg_funcs(
-    context: ValidationContext,
-) -> dict[str, Any] | None:
-    """Validate aggregation functions."""
-    if not context.agg_funcs:
-        return _error_response("No aggregation functions specified")
-
-    invalid_funcs = [
-        f for f in context.agg_funcs
-        if f.lower() not in context.valid_funcs
-    ]
-    if invalid_funcs:
-        return _error_response(f"Unsupported functions: {invalid_funcs}")
-    return None
-
-
-def _perform_aggregation(
-    context: ValidationContext,
-) -> dict[str, Any]:
-    """Perform the actual aggregation operations."""
-    if context.group_by:
-        agg_funcs_list = [
-            context.valid_funcs[f.lower()]
-            for f in context.agg_funcs
-        ]
-        results = context.dataframe.groupby(context.group_by)[context.column]
-        return results.agg(agg_funcs_list).to_dict(orient="index")
-
-    return {
-        func: getattr(
-            context.dataframe[context.column],
-            context.valid_funcs[func.lower()],
-        )()
-        for func in context.agg_funcs
-    }
-
-
-def _error_response(message: str) -> dict[str, Any]:
-    """Create a standardized error response."""
-    log_error(message)
-    return {"output": message, "should_stop": True}
+        return {"output": output, "results": results, "should_stop": True}
 
 def _apply_filter_to_dataframe(
     dataframe: pd.DataFrame,
