@@ -8,42 +8,34 @@ requires-python = ">=3.9"
 dependencies = [
     # Core dependencies
     "python-dotenv>=1.0.0",
-    "pydantic>=2.0",
     "pyyaml",
     "toml",
     "jsonschema",
-    
     # Data processing
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "openpyxl>=3.1.0",
     "pyarrow>=12.0.0",
     "scipy>=1.0.0",
-    
     # Visualization
     "matplotlib>=3.7.0",
     "seaborn>=0.12.0",
     "plotly>=5.15.0",
     "pillow>=10.0.1",
-    
     # LangChain ecosystem
     "langchain>=0.1.0",
     "langchain-community>=0.0.1",
     "ollama>=0.1.0",
-    
     # Backend
-    "fastapi==0.95.2",
-    "uvicorn==0.22.0",
-    "httpx==0.24.1",
-    "python-multipart==0.0.6",
+    "fastapi[standard]>=0.115.12",
     "pyzmq",
-    
     # Frontend
     "streamlit==1.28.0",
     "requests==2.31.0",
-    
     # Logging
     "loguru>=0.7.0",
+    "langchain-ollama>=0.3.0",
+    "numexpr>=2.10.2",
 ]
 
 [project.optional-dependencies]
@@ -67,9 +59,6 @@ docs = [
     "pygments",
 ]
 
-[build-system]
-requires = ["setuptools>=65", "wheel"]
-build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 88
