@@ -320,3 +320,5 @@ Question: List all the files
 2025-04-05 15:56:54.001 | INFO     | __main__:start_logging_server:46 - API response received in 12.61 seconds
 2025-04-05 15:56:54.002 | INFO     | __main__:start_logging_server:46 - Query processed successfully in 12.61s
 2025-04-07 12:54:39.520 | ERROR    | __main__:start_logging_server:50 - Logging server error: Address already in use (addr='tcp://0.0.0.0:5555')
+2025-04-07 23:43:30.360 | ERROR    | __main__:start_logging_server:50 - Logging server error: Address already in use (addr='tcp://0.0.0.0:5555')
+2025-04-07 23:45:41.393 | ERROR    | __main__:start_logging_server:50 - Logging server error: Address already in use (addr='tcp://0.0.0.0:5555')

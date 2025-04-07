@@ -290,35 +290,31 @@ def aggregate_and_visualize(  # noqa: PLR0915, PLR0911
                 "should_stop": True,
             }
 
-        # 4. Convert to numeric if needed
-        try:
-            data_frame[value_col] = pd.to_numeric(data_frame[value_col], errors="raise")
-            log_debug("Numeric conversion successful")
-        except ValueError:
-            error_msg = f"Could not convert {value_col} to numeric values"
-            log_error(error_msg)
-            return {
-                "output": error_msg,
-                "plot_file": None,
-                "should_stop": True,
-            }
+        # 4. Determine appropriate aggregation
+        if pd.api.types.is_numeric_dtype(data_frame[value_col]):
+            log_debug(f"{value_col} is numeric, computing mean.")
+            aggregated = data_frame.groupby(
+                        group_by, as_index=False)[value_col].mean().reset_index()
+            agg_col_name = f"avg_{value_col}"
+        else:
+            log_debug(f"{value_col} is categorical, computing count.")
+            aggregated = data_frame.groupby(
+                        group_by, as_index=False)[value_col].count().reset_index()
+            agg_col_name = f"count_{value_col}"
 
-        # 5. Aggregate data
-        try:
-            aggregated = data_frame.groupby(group_by)[value_col].mean().reset_index()
-            aggregated.columns = [group_by, f"avg_{value_col}"]
-            log_debug(f"Aggregation successful. Result shape: {aggregated.shape}")
-        except RuntimeError as e:
-            error_msg = f"Aggregation error: {e!s}"
-            log_error(error_msg)
-            return {"output": error_msg, "plot_file": None, "should_stop": True}
 
-        # 6. Generate visualization
+        if aggregated.shape[1] == 1:
+            aggregated[agg_col_name] = 0
+
+        aggregated.columns = [group_by, agg_col_name]
+        log_debug(f"Aggregation successful. Result shape: {aggregated.shape}")
+
+        # 5. Generate visualization
         try:
             plot_dir = Path("plots")
             plot_dir.mkdir(exist_ok=True)
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            plot_filename = plot_dir / f"agg_{plot_type}_plot_{timestamp}.png"
+            plot_filename = plot_dir / f"agg_{plot_type}plot{timestamp}.png"
             log_debug(f"Preparing to save plot to: {plot_filename}")
 
             plt.figure(figsize=kwargs.get("figsize", (10, 6)))
@@ -327,12 +323,15 @@ def aggregate_and_visualize(  # noqa: PLR0915, PLR0911
             if plot_type == "bar":
                 aggregated.plot.bar(
                     x=group_by,
-                    y=f"avg_{value_col}",
+                    y=agg_col_name,
                     color=kwargs.get("color", "skyblue"),
                     edgecolor="black",
                 )
-                plt.title(f"Average {value_col} by {group_by}")
-                plt.ylabel(f"Average {value_col}")
+                plt.title(
+                    f"{agg_col_name.replace('_', ' ').title()} "
+                    f"by {group_by.title()}",
+                )
+                plt.ylabel(agg_col_name.replace("_", " ").title())
             else:
                 error_msg = f"Unsupported plot type for aggregation: {plot_type}"
                 log_error(error_msg)
@@ -342,6 +341,7 @@ def aggregate_and_visualize(  # noqa: PLR0915, PLR0911
                     "should_stop": True,
                 }
 
+            plt.xticks(rotation=45, ha="right")
             plt.tight_layout()
             plt.savefig(plot_filename, dpi=300, bbox_inches="tight")
             plt.close()

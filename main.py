@@ -6,39 +6,33 @@ def run_test_queries():
     agent = initialize_custom_agent()
 
     test_queries = [
-        # Basic file operations
-        "What files are available for analysis?",
-        "Show me the first 5 rows of 'test.csv'",
-        "List all columns in 'test.csv' with their data types",
-
-        # # # Data quality checks
-        "Show me a data quality report for 'test.csv'",
-        "Check for missing values in 'test.csv'",
-        "Identify outliers in the salary column of 'test.csv'",
-
-        # # Descriptive statistics
-        "What is the average and maximum salary in 'test.csv'?",
-        "Show summary statistics for numeric columns in 'test.csv'",
-        "Calculate the correlation matrix for 'test.csv'",
-
-        # Data filtering and manipulation
-        "Filter 'test.csv' where age > 30",
-        "Sort 'test.csv' by salary in descending order",
-        "Create a new column 'bonus' as 10% of salary in 'test.csv'",
-
-        # Aggregation operations
-        "Count employees by department in 'employees.csv'",
-
-        # Sorting query
-        "sort the users by age in test.csv?",
-        "sort the users by date in stock_data.csv with price more than 153?",
+        "Show the average salary for employees aged over 35 in employees.csv.",
+        "List all available data files.",
+        "Show summary statistics for employees.csv.",
+        "Identify missing values in sales_data.csv.",
+        "Detect outliers in the salary column of employees.csv.",
+        "Filter sales_data.csv for orders where region is West.",
+        "Aggregate amount of sales for each region in sales_data.csv.",
+        "Sort employees.csv by salary in descending order.",
+        "Show a sample of 3 rows from test.csv.",
+        "List columns and data types for sales_data.csv.",
+        "Generate a data quality report for test.csv.",
+        "Calculate correlation between age and salary in employees.csv.",
+        "Create a new column bonus = salary * 0.1 in employees.csv.",
+        "Create a bar chart showing the count of employees per department in employees.csv.",
+        "Visualize the total sales amount per region using sales_data.csv.",
+        "Compute the average salary in employees.csv.",
+        "Count the total number of orders in sales_data.csv.",
+        "Compute the highest salary in employees.csv.",
+        "Convert salary column in test.csv to thousands (e.g., 75000 → 75K).",
+        "Find the total sales revenue for the 'West' region in sales_data.csv.",
 
         # Visualization queries
         # "Create a histogram of salaries from 'test.csv'",
         # "Plot a bar chart of average salary by department in 'employees.csv'",
-        # "Generate a scatter plot of age vs. salary in 'test.csv'"
+        # "Generate a scatter plot of age vs. salary in 'test.csv'",
 
-        # Advanced analysis
+        # # Advanced analysis
         # "Run regression analysis on price vs. features",
         # "Identify top 5 most frequent values in each column"
     ]

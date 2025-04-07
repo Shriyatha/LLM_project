@@ -79,7 +79,7 @@ async def startup_event() -> None:
         log_debug(f"Agent configuration: {str(app.state.agent)[:200]}...")
 
     except Exception as e:
-        log_error(f"API startup failed: {e!s}", exc_info=True)
+        log_error(f"API startup failed: {e!s}")
         raise
 
 def _handle_test_query_failure(query: str, error: Exception) -> TestQueryResponse:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -206,62 +207,110 @@ def show_data_sample(
 
 def transform_data(
     file_name: str,
-    operations: list[str],
+    operations: list[dict[str, Any]] | list[str],
     output_file: str | None = None,
 ) -> dict[str, Any]:
     """Transform data by creating new columns or modifying existing ones."""
-    log_info(
-        "Transforming data in {file_name}",
-    )
-    try:
-        dataframe = load_data(file_name)
-        if isinstance(dataframe, str):
-            log_error("Data loading error: %s", dataframe)
-            return {"output": f"Data loading error: {dataframe}", "should_stop": True}
+    log_info(f"Transforming data in {file_name}")
 
-        for operation in operations:
-            if " as " not in operation:
+    try:
+        # Load and validate data
+        dataframe = _load_and_validate_data(file_name)
+        if isinstance(dataframe, dict):
+            return dataframe
+
+        # Format operations
+        formatted_ops = _format_operations(operations)
+        if isinstance(formatted_ops, dict):
+            return formatted_ops
+
+        # Apply transformations
+        error = _apply_transformations(dataframe, formatted_ops)
+        if error:
+            return error
+
+        # Handle output
+        return _handle_output(dataframe, output_file)
+
+    except OSError as e:
+        error_msg = f"Transformation error: {e!s}"
+        log_error(error_msg)
+        return {"output": error_msg, "should_stop": True}
+
+
+def _load_and_validate_data(file_name: str) -> pd.DataFrame | dict[str, Any]:
+    """Load and validate input data."""
+    dataframe = load_data(file_name)
+    if isinstance(dataframe, str):
+        error_msg = f"Data loading error: {dataframe}"
+        log_error(error_msg)
+        return {"output": error_msg, "should_stop": True}
+    return dataframe
+
+
+def _format_operations(
+    operations: list[dict[str, Any]] | list[str],
+) -> list[str] | dict[str, Any]:
+    """Format operations into consistent string format."""
+    formatted_ops = []
+    for operation in operations:
+        if isinstance(operation, dict):
+            if "column" not in operation or "expression" not in operation:
                 error_msg = f"Invalid operation format: {operation}"
                 log_error(error_msg)
                 return {"output": error_msg, "should_stop": True}
-
-            try:
-                expr, new_col = operation.split(" as ")
-                expr = expr.strip()
-                new_col = new_col.strip()
-                dataframe[new_col] = dataframe.eval(expr)
-                log_debug("Applied transformation: %s", operation)
-            except Exception as e:  # noqa: BLE001
-                error_msg = f"Error executing '{operation}': {e!s}"
-                log_error(error_msg)
-                return {"output": error_msg, "should_stop": True}
-
-        if output_file:
-            save_path = f"data/{output_file}"
-            dataframe.to_csv(save_path, index=False)
-            result = {
-                "output": f"Transformed data saved to {save_path}",
-                "file_path": save_path,
-                "should_stop": False,
-            }
-            log_info(f"Data transformed and saved to {save_path}")
+            formatted_ops.append(f"{operation['expression']} AS {operation['column']}")
+        elif isinstance(operation, str):
+            formatted_ops.append(operation)
         else:
-            sample = dataframe.head().to_dict("records")
-            result = {
-                "output": "Transformation complete. "
-                f"Sample: {json.dumps(sample, indent=2)}",
-                "sample": sample,
-                "should_stop": True,
-            }
-            log_info("Data transformation completed")
-    except Exception as e:  # noqa: BLE001
-        log_error(f"Error transforming data in {file_name}")
-        return {
-            "output": f"Transformation error: {e!s}",
+            error_msg = f"Unsupported operation format: {operation}"
+            log_error(error_msg)
+            return {"output": error_msg, "should_stop": True}
+    return formatted_ops
+
+
+def _apply_transformations(
+    dataframe: pd.DataFrame, operations: list[str],
+) -> dict[str, Any] | None:
+    """Apply all transformations to the dataframe."""
+    for operation in operations:
+        expr, new_col = operation.split(" AS ")
+        expr = expr.strip()
+        new_col = new_col.strip()
+
+        result = dataframe.eval(expr, engine="python")
+        if not isinstance(result, pd.Series):
+            error_msg = f"Error executing '{operation}'"
+            log_error(error_msg)
+            return {"output": error_msg, "should_stop": True}
+
+        dataframe[new_col] = result
+        log_debug(f"Applied transformation: {operation}")
+    return None
+
+
+def _handle_output(
+    dataframe: pd.DataFrame, output_file: str | None,
+) -> dict[str, Any]:
+    """Handle the output of the transformation."""
+    if output_file:
+        save_path = f"data/{output_file}"
+        dataframe.to_csv(save_path, index=False)
+        result = {
+            "output": f"Transformed data saved to {save_path}",
+            "file_path": save_path,
+            "should_stop": False,
+        }
+        log_info(f"Data transformed and saved to {save_path}")
+    else:
+        sample = dataframe.head().to_dict("records")
+        result = {
+            "output": f"Transformation done. Sample: {json.dumps(sample, indent=2)}",
+            "sample": sample,
             "should_stop": True,
         }
-    else:
-        return result
+        log_info("Data transformation completed")
+    return result
 
 
 def _apply_filter_operation(
@@ -293,7 +342,8 @@ def filter_data(file_name: str, operations: list[dict]) -> dict:
     log_info("Filtering data")
     try:
         dataframe = load_data(file_name)
-        log_debug("Data loaded successfully, shape: %s", dataframe.shape)
+        log_debug(f"Data loaded successfully, shape: {dataframe.shape}")
+        dataframe.columns = dataframe.columns.str.strip().str.lower()
 
         if not operations or not all(
             isinstance(op, dict) and
@@ -301,18 +351,18 @@ def filter_data(file_name: str, operations: list[dict]) -> dict:
             for op in operations
         ):
             error_msg = "Each operation must be {column, operator, value}"
-            log_error(error_msg)
+            log_error(error_msg)  # ✅ Fixed incorrect logging
             return {"output": error_msg, "should_stop": True}
 
         filtered_df = dataframe.copy()
         for op in operations:
-            column = op["column"]
+            column = op["column"].strip().lower()
             if column not in filtered_df.columns:
                 error_msg = (
                     f"Column '{column}' not found. "
                     f"Available: {list(filtered_df.columns)}"
                 )
-                log_error(error_msg)
+                log_error(error_msg)  # ✅ Fixed incorrect logging
                 return {"output": error_msg, "should_stop": True}
 
             try:
@@ -323,14 +373,11 @@ def filter_data(file_name: str, operations: list[dict]) -> dict:
                     op["value"],
                 )
                 log_debug(
-                    "Applied filter: %s %s %s",
-                    column,
-                    op["operator"],
-                    op["value"],
+                    f"Applied filter: {column} {op['operator']} {op['value']}",
                 )
             except ValueError as e:
                 error_msg = f"Error filtering {column}: {e}"
-                log_error(error_msg)
+                log_error(error_msg)  # ✅ Fixed incorrect logging
                 return {"output": error_msg, "should_stop": True}
 
         result = {
@@ -341,72 +388,16 @@ def filter_data(file_name: str, operations: list[dict]) -> dict:
 
         if not filtered_df.empty:
             result["output"] += ":\n" + filtered_df.head().to_string()
-            log_debug("Filter results sample: %s", filtered_df.head().to_string())
+            log_debug(f"Filter results sample:\n{filtered_df.head().to_string()}")
 
         log_info("Data filtering completed successfully")
 
-    except Exception as e:  # noqa: BLE001
-        log_error("Error filtering data in %s", file_name)
+    except (OSError) as e:
+        log_error(f"Error filtering data in {file_name}")  # ✅ Fixed incorrect logging
         return {"output": f"Data processing error: {e!s}", "should_stop": True}
 
     else:
         return result
-
-def _validate_aggregation_inputs(
-    dataframe: pd.DataFrame,
-    column: str,
-    agg_funcs: list[str],
-    valid_funcs: dict[str, str],
-) -> dict | None:
-    """Validate inputs for aggregation operations.
-
-    Returns:
-        dict: Error response if validation fails, None if validation passes
-
-    """
-    if column not in dataframe.columns:
-        error_msg = f"Column '{column}' not found. Available: {list(dataframe.columns)}"
-        log_error(error_msg)
-        return {"output": error_msg, "should_stop": True}
-
-    invalid_funcs = [f for f in agg_funcs if f.lower() not in valid_funcs]
-    if invalid_funcs:
-        error_msg = f"Unsupported aggregation functions: {invalid_funcs}"
-        log_error(error_msg)
-        return {"output": error_msg, "should_stop": True}
-
-    return None
-
-def _calculate_aggregations(
-    dataframe: pd.DataFrame,
-    column: str,
-    agg_funcs: list[str],
-    valid_funcs: dict[str, str],
-    *,  # Force keyword arguments after this point
-    is_numeric: bool,
-) -> dict | tuple[dict, str]:
-    """Calculate all requested aggregations.
-
-    Returns:
-        tuple: (results_dict, error_message) - error_message is None if successful
-
-    """
-    results = {}
-    for func in agg_funcs:
-        func_lower = func.lower()
-        try:
-            agg_method = valid_funcs[func_lower]
-            if func_lower == "count" and not is_numeric:
-                results[func_lower] = dataframe.groupby(column).size().to_dict()
-            else:
-                results[func_lower] = getattr(dataframe[column], agg_method)()
-
-            log_debug("Calculated")
-        except (AttributeError, TypeError, ValueError) as e:  # Specific exceptions
-            error_msg = f"Error calculating {func}: {e!s}"
-            return {}, error_msg
-
-    return results, None
 
 def _format_aggregation_results(column: str, results: dict) -> str:
     """Format aggregation results into readable output."""
@@ -418,51 +409,63 @@ def _format_aggregation_results(column: str, results: dict) -> str:
         else:
             output.append(f"- {func}: {value}")
     return "\n".join(output)
+@dataclass
+class ValidationContext:
+    """Container for validation parameters to reduce function arguments."""
 
-def aggregate_data(file_name: str, column: str, agg_funcs: list) -> dict:
+    dataframe: pd.DataFrame
+    column: str | None
+    agg_funcs: list[str] | None
+    group_by: str | None
+    cols_available: list[str]
+    valid_funcs: dict[str, str]
+
+
+def aggregate_data(
+    file_name: str,
+    column: str | None = None,
+    agg_funcs: list[str] | None = None,
+    group_by: str | None = None,
+) -> dict[str, Any]:
     """Perform aggregation operations on a specified column."""
-    log_info("Aggregating data")
+    log_info(f"Aggregating data from {file_name}")
 
     valid_funcs = {
-        "count": "count", "mean": "mean", "max": "max",
-        "min": "min", "sum": "sum", "std": "std",
-        "median": "median", "nunique": "nunique",
+        "count": "count",
+        "mean": "mean",
+        "max": "max",
+        "min": "min",
+        "sum": "sum",
+        "std": "std",
+        "median": "median",
+        "nunique": "nunique",
     }
 
     try:
         dataframe = load_data(file_name)
         if isinstance(dataframe, str):
-            log_error("Data loading error")
-            return {"output": f"Data loading error: {dataframe}", "should_stop": True}
+            return _error_response(f"Data loading error: {dataframe}")
 
-        # Standardize column names
+        cols_available = list(dataframe.columns)
+        log_debug(f"Columns available: {cols_available}")
         dataframe.columns = dataframe.columns.str.strip().str.lower()
-        column = column.strip().lower()
-        log_debug("Standardized column name: {column}")
 
-        # Validate inputs
-        validation_result = _validate_aggregation_inputs(
-            dataframe, column, agg_funcs, valid_funcs,
+        context = ValidationContext(
+            dataframe=dataframe,
+            column=column,
+            agg_funcs=agg_funcs,
+            group_by=group_by,
+            cols_available=cols_available,
+            valid_funcs=valid_funcs,
         )
-        if validation_result:
-            return validation_result
 
-        is_numeric = pd.api.types.is_numeric_dtype(dataframe[column])
+        if error_response := _validate_inputs(context):
+            return error_response
 
-        # Calculate aggregations
-        results, error_msg = _calculate_aggregations(
-            dataframe, column, agg_funcs, valid_funcs, is_numeric=is_numeric,
-        )
-        if error_msg:
-            log_error(error_msg)
-            return {"output": error_msg, "should_stop": True}
-
-        # Format results
-        output = _format_aggregation_results(column, results)
-
-    except (pd.errors.EmptyDataError, FileNotFoundError) as e:  # Specific exceptions
-        log_error("Error aggregating data")
-        return {"output": f"Aggregation error: {e!s}", "should_stop": True}
+        results = _perform_aggregation(context)
+        output = _format_aggregation_results(context.column, results)
+    except Exception as e:  # noqa: BLE001
+        return _error_response(f"Aggregation error: {e!s}")
     else:
         return {
             "output": output,
@@ -471,6 +474,103 @@ def aggregate_data(file_name: str, column: str, agg_funcs: list) -> dict:
         }
 
 
+def _validate_inputs(
+    context: ValidationContext,
+) -> dict[str, Any] | None:
+    """Validate all inputs using the validation context."""
+    validators = [
+        _validate_column_requirement,
+        _validate_column_exists,
+        _validate_group_by_column,
+        _validate_agg_funcs,
+    ]
+
+    for validator in validators:
+        if result := validator(context):
+            return result
+    return None
+
+
+def _validate_column_requirement(
+    context: ValidationContext,
+) -> dict[str, Any] | None:
+    """Validate column requirement."""
+    if not context.column:
+        if context.agg_funcs and "count" in context.agg_funcs:
+            return {
+                "output": f"Total row count: {len(context.dataframe)}",
+                "results": {"count": len(context.dataframe)},
+                "should_stop": True,
+            }
+        return _error_response(
+            "Column required unless performing row count with 'count'",
+        )
+    return None
+
+
+def _validate_column_exists(
+    context: ValidationContext,
+) -> dict[str, Any] | None:
+    """Validate column exists in dataframe."""
+    if (context.column and
+        context.column.strip().lower() not in context.cols_available):
+        msg = f"Column '{context.column}' not found."
+        return _error_response(msg)
+    return None
+
+
+def _validate_group_by_column(
+    context: ValidationContext,
+) -> dict[str, Any] | None:
+    """Validate group_by column exists."""
+    if (context.group_by and
+        context.group_by.strip().lower() not in context.cols_available):
+        msg = f"Group-by column '{context.group_by}' not found"
+        return _error_response(msg)
+    return None
+
+
+def _validate_agg_funcs(
+    context: ValidationContext,
+) -> dict[str, Any] | None:
+    """Validate aggregation functions."""
+    if not context.agg_funcs:
+        return _error_response("No aggregation functions specified")
+
+    invalid_funcs = [
+        f for f in context.agg_funcs
+        if f.lower() not in context.valid_funcs
+    ]
+    if invalid_funcs:
+        return _error_response(f"Unsupported functions: {invalid_funcs}")
+    return None
+
+
+def _perform_aggregation(
+    context: ValidationContext,
+) -> dict[str, Any]:
+    """Perform the actual aggregation operations."""
+    if context.group_by:
+        agg_funcs_list = [
+            context.valid_funcs[f.lower()]
+            for f in context.agg_funcs
+        ]
+        results = context.dataframe.groupby(context.group_by)[context.column]
+        return results.agg(agg_funcs_list).to_dict(orient="index")
+
+    return {
+        func: getattr(
+            context.dataframe[context.column],
+            context.valid_funcs[func.lower()],
+        )()
+        for func in context.agg_funcs
+    }
+
+
+def _error_response(message: str) -> dict[str, Any]:
+    """Create a standardized error response."""
+    log_error(message)
+    return {"output": message, "should_stop": True}
 
 def _apply_filter_to_dataframe(
     dataframe: pd.DataFrame,
@@ -604,16 +704,17 @@ def summary_statistics(file_name: str) -> dict:
 
 def correlation_analysis(file_name: str, cols: list[str]) -> dict:
     """Calculate correlation between specified columns."""
-    log_info("Calculating correlations in %s, columns: %s", file_name, cols)
+    log_info(f"Calculating correlations in {file_name}, columns: {cols}")
+
     try:
         dataframe = load_data(file_name)
         if isinstance(dataframe, str):
-            log_error("Data loading error: %s", dataframe)
+            log_error(f"Data loading error: {dataframe}")
             return {"error": dataframe}
 
         dataframe.columns = dataframe.columns.str.strip().str.lower()
         cols = [col.strip().lower() for col in cols]
-        log_debug("Standardized column names: %s", cols)
+        log_debug(f"Standardized column names: {cols}")
 
         missing_cols = [col for col in cols if col not in dataframe.columns]
         if missing_cols:
@@ -631,13 +732,13 @@ def correlation_analysis(file_name: str, cols: list[str]) -> dict:
             log_warning("No numeric columns found for correlation analysis")
             return {"error": "No numeric columns found for correlation analysis"}
 
+        # Convert columns to numeric if they are not
         for col in numeric_cols:
-            if not pd.api.types.is_numeric_dtype(dataframe[col]):
-                dataframe[col] = pd.to_numeric(dataframe[col], errors="coerce")
+            dataframe[col] = pd.to_numeric(dataframe[col], errors="coerce")
 
         dataframe = dataframe.dropna(subset=numeric_cols)
         corr_matrix = dataframe[numeric_cols].corr()
-        log_debug("Correlation matrix:\n%s", corr_matrix)
+        log_debug(f"Correlation matrix:\n{corr_matrix}")
 
         result = {
             "status": "success",
@@ -645,9 +746,9 @@ def correlation_analysis(file_name: str, cols: list[str]) -> dict:
             "columns_used": numeric_cols,
             "should_stop": True,
         }
-        log_info("Correlation analysis completed successfully")
-    except Exception as e:  # noqa: BLE001
-        log_error("Error calculating correlations in %s: %s", file_name, e)
+    except (OSError) as e:
+        log_error(f"Error calculating correlations in {file_name}: {e}")
         return {"error": f"Correlation analysis error: {e!s}"}
     else:
+        log_info("Correlation analysis completed successfully")
         return result
