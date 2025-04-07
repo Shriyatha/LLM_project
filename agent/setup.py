@@ -86,35 +86,28 @@ def initialize_custom_agent() -> CustomAgentExecutor:
         StructuredTool.from_function(
             func=filter_data,
             name="FilterData",
-            description=(
-                "Filter data based on conditions (mapped to 'operations' "
-                "automatically). Input should be a JSON object with:\n"
-                "- 'file_name' (string, required)\n"
-                "- 'operations' (list of dicts, required)\n\n"
-                "Each dict must contain:\n"
-                "  - 'column' (string)\n"
-                "  - 'operator' (string: '==', '!=', '>', '<', '>=', '<=')\n"
-                "  - 'value' (any type)\n\n"
-                "If 'conditions' is provided instead of 'operations', it will "
-                "be used automatically."
-            ),
+            description="Filter data based on conditions (mapped to 'operations' automatically). "
+        "Input should be a JSON object with:\n"
+        "- 'file_name' (string, required)\n"
+        "- 'operations' (list of dictionaries, required)\n"
+        "Each dictionary must contain:\n"
+        "  - 'column' (string)\n"
+        "  - 'operator' (string: '==', '!=', '>', '<', '>=', '<=')\n"
+        "  - 'value' (any type)\n"
+        "If 'conditions' is provided instead of 'operations', it will be used automatically.",
             return_direct=True,
         ),
         StructuredTool.from_function(
             func=aggregate_data,
             name="AggregateData",
             description=(
-                "Calculate summary statistics on dataset columns.\n"
-                "Input format: {\n"
-                "  'file_name': str (required),\n"
-                "  'column': str (optional, needed for most functions),\n"
-                "  'agg_funcs': list[str] (required)\n"
-                "}\n\n"
-                "Supported functions:\n"
-                "- 'count' (works without column)\n"
-                "- 'mean', 'max', 'min', 'sum', 'std', 'median', 'nunique'\n\n"
-                "Example: {'file_name':'data.csv', 'column':'price', "
-                "'agg_funcs':['mean','max']}"
+                "Perform aggregation on a dataset to compute summary statistics. "
+                "Use this tool to count rows, calculate min/max, sum, or mean values. "
+                "Input should be a JSON object with: 'file_name' (string, required), "
+                "'column' (string, optional; required for all functions except 'count'), "
+                "'agg_funcs' (list of strings, required: supported functions are 'mean', "
+                "'max', 'min', 'sum', and 'count'). "
+                "If 'count' is used without specifying a column, it counts the total number of rows."
             ),
             return_direct=True,
         ),
