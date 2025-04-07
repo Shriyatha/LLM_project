@@ -30,7 +30,7 @@ def run_test_queries():
         "Count employees by department in 'employees.csv'",
 
         # Sorting query
-        "sort the users by age in test.csv?"
+        "sort the users by age in test.csv?",
         "sort the users by date in stock_data.csv with price more than 153?",
 
         # Visualization queries

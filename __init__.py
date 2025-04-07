@@ -1,3 +1,5 @@
+"""Exposes the main components of the system for external use."""
+
 # Package initialization
 from .agent.setup import initialize_agent
 from .config import DATA_FOLDER
